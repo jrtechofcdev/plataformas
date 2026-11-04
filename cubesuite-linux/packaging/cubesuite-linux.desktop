@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=CubeSuite Linux
+GenericName=Editor da pedaleira Cube Baby
+Comment=Edite presets e IRs da pedaleira Cuvave / M-VAVE Cube Baby
+Exec=cubesuite-linux
+Icon=cubesuite-linux
+Terminal=false
+Categories=AudioVideo;Audio;Music;
+Keywords=guitarra;pedaleira;cube;baby;mvave;cuvave;IR;midi;
+StartupWMClass=cubesuite-linux

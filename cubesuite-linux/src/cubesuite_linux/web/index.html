@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CubeSuite Linux</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- ===================== CABEÇALHO ===================== -->
+  <header class="topbar">
+    <div class="brand">
+      <img src="icon.svg" alt="" class="brand-icon">
+      <div>
+        <h1>CubeSuite <span>Linux</span></h1>
+        <p class="sub">Editor da pedaleira Cube Baby</p>
+      </div>
+    </div>
+    <div class="conn">
+      <span id="status" class="pill pill-off"><i></i><b>Desconectada</b></span>
+      <select id="portSelect" title="Porta MIDI"></select>
+      <button id="btnConnect" class="btn btn-primary">Conectar</button>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <!-- ===================== CARTÃO DO APARELHO ===================== -->
+    <section id="deviceCard" class="card device hidden">
+      <div><small>Modelo</small><strong id="devModel">—</strong></div>
+      <div><small>Nome interno</small><strong id="devName">—</strong></div>
+      <div><small>Firmware</small><strong id="devVer">—</strong></div>
+      <div><small>ID do produto</small><strong id="devPid">—</strong></div>
+      <div><small>Porta</small><strong id="devPort">—</strong></div>
+    </section>
+
+    <!-- Aviso quando desconectado -->
+    <section id="emptyState" class="card empty">
+      <div class="empty-icon">🎸</div>
+      <h2>Conecte a sua Cube Baby</h2>
+      <p>Ligue a pedaleira no USB do computador e clique em <b>Conectar</b>.
+        O programa procura a pedaleira automaticamente em todas as portas MIDI.</p>
+      <ul id="connLog" class="log"></ul>
+    </section>
+
+    <!-- ===================== ABAS ===================== -->
+    <nav id="tabs" class="tabs hidden">
+      <button data-tab="presets" class="tab active">🎛️ Presets</button>
+      <button data-tab="ir" class="tab">🔊 IR Cab</button>
+      <button data-tab="system" class="tab">⚙️ Sistema</button>
+    </nav>
+
+    <!-- ===================== ABA PRESETS ===================== -->
+    <section id="tab-presets" class="tab-panel hidden">
+      <div class="card">
+        <div class="row-between">
+          <div class="segmented" id="presetSeg"></div>
+          <div class="actions">
+            <button id="btnReload" class="btn btn-ghost">↻ Ler da pedaleira</button>
+            <button id="btnFactoryPresets" class="btn btn-danger-ghost">Restaurar fábrica</button>
+          </div>
+        </div>
+        <p class="hint">Gire os knobs com o mouse (arraste para cima/baixo), a roda do mouse ou as
+          setas do teclado. Cada mudança é enviada na hora para a pedaleira.</p>
+        <div id="pedal" class="pedal"></div>
+      </div>
+    </section>
+
+    <!-- ===================== ABA IR ===================== -->
+    <section id="tab-ir" class="tab-panel hidden">
+      <div class="grid-2">
+        <div class="card">
+          <h3>1. Escolha o arquivo de IR (.wav)</h3>
+          <label id="drop" class="drop">
+            <input id="wavInput" type="file" accept=".wav,audio/wav" hidden>
+            <span class="drop-icon">⬆️</span>
+            <span>Arraste um <b>.wav</b> aqui ou <u>clique para escolher</u></span>
+            <small>São usadas as 512 primeiras amostras (canal esquerdo), como no programa original.</small>
+          </label>
+          <div id="irInfo" class="ir-info hidden">
+            <div class="row-between"><strong id="irName">—</strong><span id="irMeta" class="tag"></span></div>
+            <canvas id="irWave" width="900" height="180"></canvas>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>2. Ajuste e ouça</h3>
+          <label class="field">
+            <span>Distância do microfone <b id="distVal">50%</b></span>
+            <input id="distance" type="range" min="1" max="100" value="50">
+          </label>
+          <label class="check"><input id="autoPreview" type="checkbox" checked>
+            Tocar o IR na pedaleira assim que escolher o arquivo (prévia, não salva)</label>
+          <button id="btnPreview" class="btn btn-ghost" disabled>▶ Enviar prévia agora</button>
+
+          <h3 class="mt">3. Salvar na memória</h3>
+          <div class="row">
+            <label class="field grow"><span>Slot de destino</span>
+              <select id="slotSelect"></select></label>
+            <button id="btnSaveIr" class="btn btn-primary" disabled>💾 Salvar IR</button>
+          </div>
+          <div id="progressBox" class="progress hidden"><div id="progressBar"></div><span id="progressText"></span></div>
+
+          <hr>
+          <h3>IRs de fábrica</h3>
+          <p class="hint">Regrava os 8 IRs originais usando o arquivo <code id="factoryFile">BFI.bin</code>
+            que vem na pasta <code>bin/</code> do CubeSuite para Windows.</p>
+          <input id="factoryInput" type="file" accept=".bin" hidden>
+          <button id="btnFactoryIr" class="btn btn-danger-ghost">Restaurar IRs de fábrica</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== ABA SISTEMA ===================== -->
+    <section id="tab-system" class="tab-panel hidden">
+      <div class="grid-2">
+        <div class="card">
+          <h3>USB Loopback</h3>
+          <p class="hint">Quando ligado, o áudio que sai do computador pelo USB também é tocado na
+            saída de fone da pedaleira (útil para tocar junto com músicas).</p>
+          <label class="switch big"><input id="loopback" type="checkbox"><span></span>
+            <b id="loopbackText">Desligado</b></label>
+        </div>
+        <div class="card">
+          <h3>Registro da conexão</h3>
+          <ul id="sysLog" class="log"></ul>
+          <p class="hint">Problemas? Veja o <b>README</b>: permissões do grupo <code>audio</code>,
+            porta ocupada por outro programa, etc.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">CubeSuite Linux <span id="appVer"></span> · projeto independente, sem vínculo com o fabricante</footer>
+
+  <!-- Avisos (toasts) e diálogo de confirmação -->
+  <div id="toasts" class="toasts"></div>
+  <dialog id="confirmDlg" class="dialog">
+    <h3 id="confirmTitle">Confirmar</h3>
+    <p id="confirmText"></p>
+    <div class="actions end">
+      <button id="confirmNo" class="btn btn-ghost">Cancelar</button>
+      <button id="confirmYes" class="btn btn-primary">Confirmar</button>
+    </div>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>
