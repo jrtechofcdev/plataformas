@@ -20,7 +20,9 @@ public class DeviceTest {
             public byte[] receive(long t) { return q.poll(); }
             public void clear() { q.clear(); }
         });
+        CubeDevice.logger = line -> System.out.println("     log: " + line);
         d.connect();
+        CubeDevice.traceBytes = false;
         check(d.model.equals("Cube Baby") && d.generation == 2, "identificação: " + d.model + " " + d.name + " fw " + d.version + String.format(" pid 0x%04X", d.productId));
         int[][] p = d.readPresets();
         check(p[0][5] == 38 && p[0][0] == 2, "leitura dos presets (A: volume=38, type=2)");
@@ -40,6 +42,11 @@ public class DeviceTest {
         check(dump[2].startsWith("00000000") && dump[2].substring(8, 16).equals("3333333f"), "IR salvo na flash (distância 0.7)");
         int[][] f = d.factoryPresets();
         check(f[1][1] == 3, "presets de fábrica restaurados");
+        // pacotes USB-MIDI (modo USB direto): SysEx de 10 bytes -> 4 pacotes de 4 bytes
+        byte[] sx = com.jrtechofc.cuberemote.CubeProtocol.toSysex(com.jrtechofc.cuberemote.CubeProtocol.reqIdentify());
+        byte[] usb = com.jrtechofc.cuberemote.UsbRawLink.encodeForTest(sx);
+        check(usb.length == 16 && usb[0] == 0x04 && usb[12] == 0x05 && (usb[13] & 0xFF) == 0xF7,
+              "codificação USB-MIDI do SysEx: " + CubeDevice.hex(usb, 16));
         py.destroy();
         System.out.println("TODOS OS TESTES PASSARAM");
     }

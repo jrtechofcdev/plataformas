@@ -1,13 +1,25 @@
 package com.jrtechofc.cuberemote;
 
 import android.app.Activity;
+import android.app.PendingIntent;
+import android.content.BroadcastReceiver;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.hardware.usb.UsbConstants;
+import android.hardware.usb.UsbDevice;
+import android.hardware.usb.UsbEndpoint;
+import android.hardware.usb.UsbInterface;
+import android.hardware.usb.UsbManager;
 import android.media.midi.MidiDevice;
 import android.media.midi.MidiDeviceInfo;
 import android.media.midi.MidiManager;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -30,24 +42,37 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Tela principal: mostra a interface (assets/www/index.html) e faz a ponte
- * entre o JavaScript e a pedaleira (USB-MIDI).
+ * entre o JavaScript e a pedaleira.
  *
- * O JavaScript chama:  CubeNative.call(id, "metodo", "{json}")
- * e recebe a resposta em: window.cubeResolve(id, ok, resultado)
- * Avisos de conexão chegam em: window.cubeEvent(nome, dados)
+ * Conexão em 2 métodos:
+ *   1) MIDI do Android (MidiManager) — testa todas as portas de cada aparelho MIDI;
+ *   2) USB direto (UsbManager) — plano B quando o celular não lista a pedaleira como MIDI.
+ *
+ * Tudo é registrado no log (AppLog), visível no botão 📋 do app.
  */
 public class MainActivity extends Activity {
+    static final String VERSION = "1.1.0";
     private static final int PICK_FILE = 41;
+    private static final String ACTION_USB_PERMISSION = "com.jrtechofc.cuberemote.USB_PERMISSION";
 
     private WebView web;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
+    private AppLog log;
     private MidiManager midi;
-    private MidiLink link;
+    private UsbManager usb;
+    private CubeDevice.Link link;
+    private MidiDevice openMidiDevice;
     private CubeDevice cube;
-    private MidiDeviceInfo cubeInfo;
+    private String cubeSource = "";
+    private int cubeMidiId = -1;
+    private String cubeUsbName = null;
     private volatile boolean connecting = false;
     private ValueCallback<Uri[]> fileCallback;
+
+    // linhas de log que ainda vão para a tela (mandadas em lote, a cada 250 ms)
+    private final StringBuilder pendingLog = new StringBuilder();
+    private boolean logFlushScheduled = false;
 
     @Override
     protected void onCreate(Bundle saved) {
@@ -55,6 +80,16 @@ public class MainActivity extends Activity {
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON); // tela não apaga no palco
         getWindow().setStatusBarColor(Color.parseColor("#0b0d10"));
         getWindow().setNavigationBarColor(Color.parseColor("#0b0d10"));
+
+        log = new AppLog(this);
+        CubeDevice.logger = log;
+        log.setListener(this::queueLogToScreen);
+        log.log("===== Cube Remote " + VERSION + " iniciado =====");
+        log.log("Celular: " + Build.MANUFACTURER + " " + Build.MODEL + " · Android " + Build.VERSION.RELEASE
+                + " (API " + Build.VERSION.SDK_INT + ")");
+        PackageManager pm = getPackageManager();
+        log.log("Suporte MIDI: " + pm.hasSystemFeature(PackageManager.FEATURE_MIDI)
+                + " · USB host (OTG): " + pm.hasSystemFeature(PackageManager.FEATURE_USB_HOST));
 
         web = new WebView(this);
         web.setBackgroundColor(Color.parseColor("#0b0d10"));
@@ -79,19 +114,49 @@ public class MainActivity extends Activity {
         setContentView(web);
         web.loadUrl("file:///android_asset/www/index.html");
 
+        usb = (UsbManager) getSystemService(Context.USB_SERVICE);
         midi = (MidiManager) getSystemService(Context.MIDI_SERVICE);
         if (midi != null) {
             midi.registerDeviceCallback(new MidiManager.DeviceCallback() {
                 @Override public void onDeviceAdded(MidiDeviceInfo info) {
-                    if (cube == null) main.postDelayed(MainActivity.this::connectAsync, 600);
+                    log.log("Sistema MIDI: aparelho adicionado → " + describe(info));
+                    if (cube == null) main.postDelayed(MainActivity.this::connectAsync, 800);
                 }
                 @Override public void onDeviceRemoved(MidiDeviceInfo info) {
-                    if (cubeInfo != null && info.getId() == cubeInfo.getId()) {
-                        worker.execute(() -> { disconnect(); event("status", status("off", "Pedaleira desconectada")); });
-                    }
+                    log.log("Sistema MIDI: aparelho removido → " + describe(info));
+                    if (info.getId() == cubeMidiId) lost("Pedaleira desconectada");
                 }
             }, main);
+        } else {
+            log.log("ATENÇÃO: MidiManager indisponível (o celular não tem MIDI do Android). Só o modo USB direto funcionará.");
         }
+        IntentFilter f = new IntentFilter(UsbManager.ACTION_USB_DEVICE_DETACHED);
+        registerReceiverCompat(new BroadcastReceiver() {
+            @Override public void onReceive(Context c, Intent i) {
+                UsbDevice d = i.getParcelableExtra(UsbManager.EXTRA_DEVICE);
+                log.log("USB: aparelho removido " + (d != null ? d.getDeviceName() : ""));
+                if (d != null && d.getDeviceName().equals(cubeUsbName)) lost("Pedaleira desconectada (USB)");
+            }
+        }, f, true);
+        handleUsbIntent(getIntent());
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        handleUsbIntent(intent);
+    }
+
+    private void handleUsbIntent(Intent intent) {
+        if (intent != null && UsbManager.ACTION_USB_DEVICE_ATTACHED.equals(intent.getAction())) {
+            UsbDevice d = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
+            log.log("Aberto ao plugar USB: " + (d != null ? usbSummary(d) : "?"));
+            if (cube == null) main.postDelayed(this::connectAsync, 1200);
+        }
+    }
+
+    private void lost(String why) {
+        worker.execute(() -> { disconnect(); event("status", status("off", why)); });
     }
 
     @Override
@@ -111,50 +176,127 @@ public class MainActivity extends Activity {
         super.onDestroy();
     }
 
-    // ------------------------------------------------------------ conexão
+    private void registerReceiverCompat(BroadcastReceiver r, IntentFilter f, boolean exported) {
+        if (Build.VERSION.SDK_INT >= 33) registerReceiver(r, f, exported ? 2 /*RECEIVER_EXPORTED*/ : 4 /*NOT_EXPORTED*/);
+        else registerReceiver(r, f);
+    }
+
+    // ================================================================ conexão
     private void connectAsync() {
         if (connecting) return;
         connecting = true;
         worker.execute(() -> {
-            try { connectNow(); } finally { connecting = false; }
+            try { connectNow(); }
+            catch (Throwable t) { log.log("ERRO inesperado na conexão: " + t); event("status", status("off", "Erro: " + t.getMessage())); }
+            finally { connecting = false; }
         });
     }
 
-    @SuppressWarnings("deprecation")
     private void connectNow() {
         disconnect();
-        if (midi == null) { event("status", status("error", "Este celular não tem suporte a MIDI (Android 6 ou mais novo é necessário).")); return; }
         event("status", status("search", "Procurando a pedaleira…"));
+        log.log("---------- Nova tentativa de conexão ----------");
+
+        if (tryMidiManager()) return;
+        if (tryUsbDirect()) return;
+
+        log.log("✗ Pedaleira NÃO encontrada. Toque em 📋 → Compartilhar e envie este log.");
+        event("status", status("off", "Pedaleira não encontrada.\nToque em 📋 Log para ver os detalhes e compartilhar."));
+    }
+
+    /** Método 1: sistema MIDI do Android. */
+    @SuppressWarnings("deprecation")
+    private boolean tryMidiManager() {
+        if (midi == null) { log.log("Método 1 (MIDI Android): indisponível neste celular"); return false; }
+        MidiDeviceInfo[] all = midi.getDevices();
+        log.log("Método 1 (MIDI Android): " + all.length + " aparelho(s) MIDI no sistema");
         List<MidiDeviceInfo> list = new ArrayList<>();
-        for (MidiDeviceInfo i : midi.getDevices()) if (i.getType() == MidiDeviceInfo.TYPE_USB) list.add(i);
-        for (MidiDeviceInfo i : midi.getDevices()) if (i.getType() != MidiDeviceInfo.TYPE_USB) list.add(i);
-        StringBuilder log = new StringBuilder();
+        for (MidiDeviceInfo i : all) if (i.getType() == MidiDeviceInfo.TYPE_USB) list.add(i);
+        for (MidiDeviceInfo i : all) if (i.getType() != MidiDeviceInfo.TYPE_USB) list.add(i);
         for (MidiDeviceInfo info : list) {
-            if (info.getInputPortCount() < 1 || info.getOutputPortCount() < 1) continue;
-            String label = deviceLabel(info);
+            log.log("  • " + describe(info));
+            if (info.getInputPortCount() < 1 || info.getOutputPortCount() < 1) { log.log("    (sem par entrada/saída — pulando)"); continue; }
             MidiDevice dev = openDevice(info);
-            if (dev == null) { log.append(label).append(": não abriu\n"); continue; }
-            try {
-                MidiLink l = new MidiLink(dev, 0, 0);
-                CubeDevice c = new CubeDevice(l);
+            if (dev == null) { log.log("    ✗ não abriu (openDevice retornou nada em 5 s)"); continue; }
+            for (int in = 0; in < info.getInputPortCount(); in++) {
+                MidiLink l = null;
                 try {
+                    l = new MidiLink(dev, in, false);
+                    sleep(250);
+                    CubeDevice c = new CubeDevice(l);
                     c.connect();
-                    link = l; cube = c; cubeInfo = info;
-                    event("status", fullState());
-                    return;
+                    link = l; cube = c; openMidiDevice = dev; cubeMidiId = info.getId();
+                    cubeSource = "MIDI Android · " + name(info) + " · porta " + in;
+                    connected();
+                    return true;
                 } catch (Exception e) {
-                    log.append(label).append(": ").append(e.getMessage()).append('\n');
-                    l.close();
+                    log.log("    ✗ porta " + in + ": " + e.getMessage());
+                    if (l != null) l.close();
                 }
-            } catch (Exception e) {
-                log.append(label).append(": ").append(e.getMessage()).append('\n');
-                try { dev.close(); } catch (Exception ignored) {}
+            }
+            try { dev.close(); } catch (Exception ignored) {}
+        }
+        return false;
+    }
+
+    /** Método 2: USB direto, sem passar pelo sistema MIDI. */
+    private boolean tryUsbDirect() {
+        if (usb == null) { log.log("Método 2 (USB direto): UsbManager indisponível"); return false; }
+        java.util.Collection<UsbDevice> devs = usb.getDeviceList().values();
+        log.log("Método 2 (USB direto): " + devs.size() + " aparelho(s) USB conectado(s)");
+        if (devs.isEmpty())
+            log.log("  Nenhum aparelho USB visto. Verifique cabo/adaptador OTG e se o OTG está ativado nas configurações do celular.");
+        for (UsbDevice d : devs) {
+            logUsbDevice(d);
+            UsbInterface[] cands = UsbRawLink.candidateInterfaces(d);
+            if (cands.length == 0) { log.log("    (nenhuma interface MIDI/bulk utilizável)"); continue; }
+            if (!ensurePermission(d)) continue;
+            for (UsbInterface it : cands) {
+                UsbRawLink l = null;
+                try {
+                    l = new UsbRawLink(usb, d, it, 0);
+                    sleep(250);
+                    CubeDevice c = new CubeDevice(l);
+                    c.connect();
+                    link = l; cube = c; cubeUsbName = d.getDeviceName();
+                    cubeSource = "USB direto · " + productName(d) + " · interface " + it.getId();
+                    connected();
+                    return true;
+                } catch (Exception e) {
+                    log.log("    ✗ interface " + it.getId() + ": " + e.getMessage());
+                    if (l != null) l.close();
+                }
             }
         }
-        String msg = list.isEmpty()
-                ? "Nenhum aparelho MIDI encontrado. Ligue a pedaleira com o cabo/adaptador OTG."
-                : "Pedaleira não encontrada.\n" + log;
-        event("status", status("off", msg.trim()));
+        return false;
+    }
+
+    private boolean ensurePermission(UsbDevice d) {
+        if (usb.hasPermission(d)) { log.log("    permissão USB: já concedida"); return true; }
+        log.log("    pedindo permissão USB ao usuário…");
+        event("status", status("search", "Toque em PERMITIR na janela do Android para acessar a pedaleira"));
+        final boolean[] ok = {false};
+        final CountDownLatch done = new CountDownLatch(1);
+        BroadcastReceiver r = new BroadcastReceiver() {
+            @Override public void onReceive(Context c, Intent i) {
+                ok[0] = i.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false);
+                done.countDown();
+            }
+        };
+        registerReceiverCompat(r, new IntentFilter(ACTION_USB_PERMISSION), false);
+        int flags = Build.VERSION.SDK_INT >= 31 ? 0x02000000 /*FLAG_MUTABLE*/ : 0;
+        Intent i = new Intent(ACTION_USB_PERMISSION).setPackage(getPackageName());
+        usb.requestPermission(d, PendingIntent.getBroadcast(this, 0, i, flags));
+        try { done.await(40, TimeUnit.SECONDS); } catch (InterruptedException ignored) {}
+        try { unregisterReceiver(r); } catch (Exception ignored) {}
+        boolean granted = ok[0] || usb.hasPermission(d);
+        log.log("    permissão USB: " + (granted ? "concedida" : "NEGADA ou sem resposta"));
+        return granted;
+    }
+
+    private void connected() {
+        log.log("✓ CONECTADA via " + cubeSource + " — " + cube.model + String.format(" (ID 0x%04X, geração %d)", cube.productId, cube.generation));
+        event("status", fullState());
     }
 
     private MidiDevice openDevice(MidiDeviceInfo info) {
@@ -165,19 +307,93 @@ public class MainActivity extends Activity {
         return out[0];
     }
 
-    private static String deviceLabel(MidiDeviceInfo info) {
+    private void disconnect() {
+        if (link instanceof MidiLink) ((MidiLink) link).close();
+        if (link instanceof UsbRawLink) ((UsbRawLink) link).close();
+        if (openMidiDevice != null) try { openMidiDevice.close(); } catch (Exception ignored) {}
+        if (cube != null) log.log("Desconectado.");
+        link = null; cube = null; openMidiDevice = null; cubeMidiId = -1; cubeUsbName = null;
+    }
+
+    private static void sleep(long ms) { try { Thread.sleep(ms); } catch (InterruptedException ignored) {} }
+
+    // ================================================================ descrição p/ log
+    private static String name(MidiDeviceInfo info) {
         Bundle p = info.getProperties();
         String n = p.getString(MidiDeviceInfo.PROPERTY_NAME);
         if (n == null) n = p.getString(MidiDeviceInfo.PROPERTY_PRODUCT);
         return n != null ? n : "MIDI " + info.getId();
     }
 
-    private void disconnect() {
-        if (link != null) link.close();
-        link = null; cube = null; cubeInfo = null;
+    private static String describe(MidiDeviceInfo info) {
+        Bundle p = info.getProperties();
+        String type = info.getType() == MidiDeviceInfo.TYPE_USB ? "USB"
+                : info.getType() == MidiDeviceInfo.TYPE_BLUETOOTH ? "Bluetooth" : "virtual";
+        StringBuilder sb = new StringBuilder();
+        sb.append('"').append(name(info)).append("\" id=").append(info.getId()).append(" tipo=").append(type)
+          .append(" fabricante=").append(p.getString(MidiDeviceInfo.PROPERTY_MANUFACTURER))
+          .append(" entradas=").append(info.getInputPortCount()).append(" saídas=").append(info.getOutputPortCount());
+        for (MidiDeviceInfo.PortInfo pi : info.getPorts())
+            sb.append(" [").append(pi.getType() == MidiDeviceInfo.PortInfo.TYPE_INPUT ? "in" : "out")
+              .append(pi.getPortNumber()).append(':').append(pi.getName()).append(']');
+        return sb.toString();
     }
 
-    // ------------------------------------------------------------ respostas para o JS
+    private static String productName(UsbDevice d) {
+        String n = Build.VERSION.SDK_INT >= 21 ? d.getProductName() : null;
+        return n != null ? n : d.getDeviceName();
+    }
+
+    private static String usbSummary(UsbDevice d) {
+        return String.format("\"%s\" VID:PID=%04X:%04X", productName(d), d.getVendorId(), d.getProductId());
+    }
+
+    private void logUsbDevice(UsbDevice d) {
+        String mf = Build.VERSION.SDK_INT >= 21 ? d.getManufacturerName() : null;
+        log.log("  • " + usbSummary(d) + " fabricante=" + mf + " classe=" + d.getDeviceClass() + " " + d.getDeviceName()
+                + " interfaces=" + d.getInterfaceCount());
+        for (int i = 0; i < d.getInterfaceCount(); i++) {
+            UsbInterface it = d.getInterface(i);
+            StringBuilder sb = new StringBuilder();
+            for (int e = 0; e < it.getEndpointCount(); e++) {
+                UsbEndpoint ep = it.getEndpoint(e);
+                String t = ep.getType() == UsbConstants.USB_ENDPOINT_XFER_BULK ? "bulk"
+                        : ep.getType() == UsbConstants.USB_ENDPOINT_XFER_INT ? "int"
+                        : ep.getType() == UsbConstants.USB_ENDPOINT_XFER_ISOC ? "isoc" : "ctrl";
+                sb.append(String.format(" ep%02X(%s %s %dB)", ep.getAddress(),
+                        ep.getDirection() == UsbConstants.USB_DIR_IN ? "IN" : "OUT", t, ep.getMaxPacketSize()));
+            }
+            String kind = it.getInterfaceClass() == 1 && it.getInterfaceSubclass() == 3 ? " ← MIDI"
+                    : it.getInterfaceClass() == 1 && it.getInterfaceSubclass() == 1 ? " (áudio controle)"
+                    : it.getInterfaceClass() == 1 && it.getInterfaceSubclass() == 2 ? " (áudio stream)" : "";
+            log.log(String.format("      if%d alt%d classe=%d sub=%d%s%s", it.getId(),
+                    Build.VERSION.SDK_INT >= 21 ? it.getAlternateSetting() : 0,
+                    it.getInterfaceClass(), it.getInterfaceSubclass(), kind, sb));
+        }
+    }
+
+    /** Relatório completo do que o celular enxerga (sem conectar). */
+    @SuppressWarnings("deprecation")
+    private void diagnostics() {
+        log.log("========== DIAGNÓSTICO ==========");
+        log.log("App " + VERSION + " · " + Build.MANUFACTURER + " " + Build.MODEL + " · Android " + Build.VERSION.RELEASE + " (API " + Build.VERSION.SDK_INT + ")");
+        if (midi != null) {
+            MidiDeviceInfo[] all = midi.getDevices();
+            log.log("Sistema MIDI: " + all.length + " aparelho(s)");
+            for (MidiDeviceInfo i : all) log.log("  • " + describe(i));
+        } else log.log("Sistema MIDI: indisponível");
+        if (usb != null) {
+            log.log("USB: " + usb.getDeviceList().size() + " aparelho(s)");
+            for (UsbDevice d : usb.getDeviceList().values()) {
+                logUsbDevice(d);
+                log.log("    permissão USB: " + (usb.hasPermission(d) ? "sim" : "não"));
+            }
+        }
+        log.log("Conectada agora: " + (cube != null ? cubeSource : "não"));
+        log.log("=================================");
+    }
+
+    // ================================================================ respostas para o JS
     private JSONObject status(String state, String message) {
         JSONObject o = new JSONObject();
         try { o.put("state", state); o.put("message", message); } catch (Exception ignored) {}
@@ -188,17 +404,19 @@ public class MainActivity extends Activity {
         JSONObject o = status("on", "Conectada");
         try {
             CubeDevice c = cube;
-            o.put("device", deviceLabel(cubeInfo));
+            o.put("device", cubeSource);
             o.put("name", c.name);
             o.put("version", c.version);
             o.put("model", c.model);
             o.put("productId", String.format("0x%04X", c.productId));
             o.put("generation", c.generation);
+            o.put("appVersion", VERSION);
             if (c.generation == 2) {
                 o.put("presets", presetsJson(c.readPresets()));
                 o.put("loopback", c.getLoopback());
             }
         } catch (Exception e) {
+            log.log("Aviso ao ler o estado: " + e.getMessage());
             try { o.put("warning", e.getMessage()); } catch (Exception ignored) {}
         }
         return o;
@@ -222,14 +440,39 @@ public class MainActivity extends Activity {
         main.post(() -> web.evaluateJavascript(code, null));
     }
 
-    // ------------------------------------------------------------ ponte JavaScript -> Java
+    private void queueLogToScreen(String line) {
+        synchronized (pendingLog) {
+            pendingLog.append(line).append('\n');
+            if (logFlushScheduled) return;
+            logFlushScheduled = true;
+        }
+        main.postDelayed(() -> {
+            String chunk;
+            synchronized (pendingLog) {
+                chunk = pendingLog.toString();
+                pendingLog.setLength(0);
+                logFlushScheduled = false;
+            }
+            web.evaluateJavascript("window.cubeLog && window.cubeLog(" + JSONObject.quote(chunk) + ")", null);
+        }, 250);
+    }
+
+    // ================================================================ ponte JavaScript -> Java
     private class Bridge {
         @JavascriptInterface
         public void call(final String id, final String method, final String argsJson) {
-            if ("connect".equals(method)) {   // conexão tem fila própria
-                connectAsync();
-                resolve(id, true, "null");
-                return;
+            switch (method) {   // estas não precisam esperar a fila da pedaleira
+                case "connect": connectAsync(); resolve(id, true, "null"); return;
+                case "getLog": resolve(id, true, JSONObject.quote(log.all())); return;
+                case "clearLog": log.clear(); log.log("Log limpo."); resolve(id, true, "null"); return;
+                case "copyLog": copyLog(); resolve(id, true, "null"); return;
+                case "shareLog": shareLog(); resolve(id, true, "null"); return;
+                case "diag": new Thread(MainActivity.this::diagnostics).start(); resolve(id, true, "null"); return;
+                case "setTrace":
+                    try { CubeDevice.traceBytes = new JSONObject(argsJson).getBoolean("on"); } catch (Exception ignored) {}
+                    log.log("Registro de bytes (TX/RX): " + (CubeDevice.traceBytes ? "ligado" : "desligado"));
+                    resolve(id, true, "null"); return;
+                default: break;
             }
             worker.execute(new Runnable() {
                 @Override public void run() { execute(id, method, argsJson); }
@@ -241,11 +484,12 @@ public class MainActivity extends Activity {
                 JSONObject a = new JSONObject(argsJson == null || argsJson.isEmpty() ? "{}" : argsJson);
                 resolve(id, true, run(method, a));
             } catch (Exception e) {
+                String msg = e.getMessage() == null ? e.toString() : e.getMessage();
+                log.log("Erro em '" + method + "': " + msg);
                 if (e instanceof java.io.IOException || e instanceof IllegalStateException) {
                     disconnect();
-                    event("status", status("off", "Conexão perdida: " + e.getMessage()));
+                    event("status", status("off", "Conexão perdida: " + msg));
                 }
-                String msg = e.getMessage() == null ? e.toString() : e.getMessage();
                 resolve(id, false, JSONObject.quote(msg));
             }
         }
@@ -261,18 +505,22 @@ public class MainActivity extends Activity {
                 case "presets":
                     return presetsJson(c.readPresets()).toString();
                 case "factoryPresets":
+                    log.log("Restaurando presets de fábrica");
                     return presetsJson(c.factoryPresets()).toString();
                 case "loopback":
                     c.setLoopback(a.getBoolean("on"));
                     return String.valueOf(c.getLoopback());
                 case "irPreview":
+                    log.log("Enviando prévia de IR");
                     c.irPreview(floats(a.getJSONArray("samples")), a.getInt("distance"));
                     return "true";
                 case "irDistance":
                     c.irDistance(a.getInt("distance"));
                     return "true";
                 case "irSave":
+                    log.log("Salvando IR no slot " + (a.getInt("slot") + 1));
                     c.irSave(a.getInt("slot"), floats(a.getJSONArray("samples")), a.getInt("distance"));
+                    log.log("IR salvo");
                     return "true";
                 default:
                     throw new CubeDevice.DeviceException("função desconhecida: " + m);
@@ -288,5 +536,28 @@ public class MainActivity extends Activity {
         private void resolve(String id, boolean ok, String json) {
             js("window.cubeResolve && window.cubeResolve(" + JSONObject.quote(id) + "," + ok + "," + json + ")");
         }
+    }
+
+    private String logForSharing() {
+        String all = log.all();
+        // WhatsApp e afins aceitam textos grandes, mas limitamos às últimas ~60 mil letras
+        return all.length() > 60000 ? "…(início cortado)\n" + all.substring(all.length() - 60000) : all;
+    }
+
+    private void copyLog() {
+        main.post(() -> {
+            ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+            cm.setPrimaryClip(ClipData.newPlainText("Cube Remote log", logForSharing()));
+        });
+    }
+
+    private void shareLog() {
+        main.post(() -> {
+            Intent i = new Intent(Intent.ACTION_SEND);
+            i.setType("text/plain");
+            i.putExtra(Intent.EXTRA_SUBJECT, "Log do Cube Remote " + VERSION);
+            i.putExtra(Intent.EXTRA_TEXT, logForSharing());
+            startActivity(Intent.createChooser(i, "Compartilhar log"));
+        });
     }
 }

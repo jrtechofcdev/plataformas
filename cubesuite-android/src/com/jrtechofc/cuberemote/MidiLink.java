@@ -5,69 +5,67 @@ import android.media.midi.MidiInputPort;
 import android.media.midi.MidiOutputPort;
 import android.media.midi.MidiReceiver;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
 
 /**
- * MidiLink — envia/recebe SysEx por uma porta USB-MIDI do Android (android.media.midi).
+ * MÉTODO 1 — MIDI do Android (android.media.midi).
  *
- * Atenção aos nomes do Android (são "do ponto de vista do aparelho"):
- *   MidiInputPort  = entrada DA PEDALEIRA  -> nós ENVIAMOS por ela
- *   MidiOutputPort = saída DA PEDALEIRA    -> nós RECEBEMOS por ela
+ * Atenção aos nomes do Android (do ponto de vista do APARELHO):
+ *   MidiInputPort  = entrada da pedaleira -> nós ENVIAMOS por ela
+ *   MidiOutputPort = saída da pedaleira   -> nós RECEBEMOS por ela
+ * Escutamos TODAS as saídas da pedaleira ao mesmo tempo (algumas têm mais de uma).
  */
 public class MidiLink implements CubeDevice.Link {
     private final MidiDevice device;
     private final MidiInputPort toPedal;
-    private final MidiOutputPort fromPedal;
-    private final LinkedBlockingQueue<byte[]> inbox = new LinkedBlockingQueue<>();
-    private final ByteArrayOutputStream partial = new ByteArrayOutputStream();
-    private boolean inSysex = false;
-
+    private final MidiOutputPort[] fromPedal;
+    private final SysexAssembler rx;
+    private final String tag;
     private final MidiReceiver receiver = new MidiReceiver() {
-        @Override
-        public void onSend(byte[] msg, int offset, int count, long timestamp) {
-            // O USB entrega o SysEx em pedaços: juntamos até achar o F7.
-            synchronized (partial) {
-                for (int i = offset; i < offset + count; i++) {
-                    int b = msg[i] & 0xFF;
-                    if (b >= 0xF8) continue;                 // mensagens de tempo real: ignora
-                    if (b == 0xF0) { partial.reset(); inSysex = true; }
-                    if (!inSysex) continue;
-                    partial.write(b);
-                    if (b == 0xF7) { inbox.offer(partial.toByteArray()); partial.reset(); inSysex = false; }
-                }
-            }
+        @Override public void onSend(byte[] msg, int offset, int count, long timestamp) {
+            rx.feed(msg, offset, count);
         }
     };
 
-    public MidiLink(MidiDevice device, int inPortIndex, int outPortIndex) throws IOException {
+    /** @param closeDeviceOnClose se false, só fecha as portas (para testar outra porta no mesmo aparelho) */
+    private final boolean closeDevice;
+
+    public MidiLink(MidiDevice device, int inPort, boolean closeDeviceOnClose) throws IOException {
         this.device = device;
-        toPedal = device.openInputPort(inPortIndex);
-        fromPedal = device.openOutputPort(outPortIndex);
-        if (toPedal == null || fromPedal == null) {
-            close();
-            throw new IOException("não consegui abrir as portas MIDI (em uso por outro app?)");
+        this.closeDevice = closeDeviceOnClose;
+        this.tag = "[MIDI in" + inPort + "]";
+        this.rx = new SysexAssembler(tag);
+        toPedal = device.openInputPort(inPort);
+        if (toPedal == null) throw new IOException("porta de entrada " + inPort + " não abriu (em uso por outro app?)");
+        int n = device.getInfo().getOutputPortCount();
+        fromPedal = new MidiOutputPort[n];
+        int opened = 0;
+        for (int i = 0; i < n; i++) {
+            fromPedal[i] = device.openOutputPort(i);
+            if (fromPedal[i] != null) { fromPedal[i].connect(receiver); opened++; }
+            else CubeDevice.log(tag + " saída " + i + " não abriu");
         }
-        fromPedal.connect(receiver);
+        if (opened == 0) { close(); throw new IOException("nenhuma porta de saída abriu"); }
+        CubeDevice.log(tag + " portas abertas: envio=in" + inPort + ", escuta=" + opened + " saída(s)");
     }
 
     @Override public void send(byte[] sysex) throws IOException {
+        if (CubeDevice.traceBytes) CubeDevice.log(tag + " TX " + sysex.length + "B " + CubeDevice.hex(sysex, 48));
         // o Android aceita até ~1015 bytes por envio; mandamos em partes por segurança
         for (int off = 0; off < sysex.length; off += 512)
             toPedal.send(sysex, off, Math.min(512, sysex.length - off));
     }
 
-    @Override public byte[] receive(long timeoutMs) throws InterruptedException {
-        return inbox.poll(timeoutMs, TimeUnit.MILLISECONDS);
-    }
+    @Override public byte[] receive(long timeoutMs) throws InterruptedException { return rx.poll(timeoutMs); }
 
-    @Override public void clear() { inbox.clear(); }
+    @Override public void clear() { rx.clear(); }
 
     public void close() {
-        try { if (fromPedal != null) { fromPedal.disconnect(receiver); fromPedal.close(); } } catch (Exception ignored) {}
+        for (MidiOutputPort p : fromPedal) {
+            if (p == null) continue;
+            try { p.disconnect(receiver); p.close(); } catch (Exception ignored) {}
+        }
         try { if (toPedal != null) toPedal.close(); } catch (Exception ignored) {}
-        try { device.close(); } catch (Exception ignored) {}
+        if (closeDevice) try { device.close(); } catch (Exception ignored) {}
     }
 }

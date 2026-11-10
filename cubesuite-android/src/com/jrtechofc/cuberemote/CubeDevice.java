@@ -30,6 +30,30 @@ public class CubeDevice {
         public DeviceException(String m) { super(m); }
     }
 
+    /** Destino das mensagens de log (no Android: AppLog; nos testes: console). */
+    public interface Logger { void log(String line); }
+    public static volatile Logger logger = null;
+    /** Se true, registra cada pacote enviado/recebido (bom para diagnóstico). */
+    public static volatile boolean traceBytes = true;
+
+    public static void log(String s) { Logger l = logger; if (l != null) l.log(s); }
+
+    public static String hex(byte[] b, int max) {
+        StringBuilder sb = new StringBuilder();
+        int n = Math.min(b.length, max);
+        for (int i = 0; i < n; i++) sb.append(String.format("%02X ", b[i] & 0xFF));
+        if (b.length > max) sb.append("… (+").append(b.length - max).append(")");
+        return sb.toString().trim();
+    }
+
+    private static String cmdName(int c) {
+        switch (c) {
+            case 0x00: return "ACK"; case 0x11: return "IDENTIFICAR"; case 0x21: return "APAGAR";
+            case 0x22: return "ESCREVER"; case 0x23: return "LER"; case 0x24: return "SOMA16";
+            default: return String.format("CMD%02X", c);
+        }
+    }
+
     public static final int FLASH = 0, RAM = 4, PRESETS = 5;
     public static final long LIVE = 0x80000000L;
     static final int CHUNK = 0x80, READ_CHUNK = CHUNK - 15, BLOCK = 0x1000, FLASH_SIZE = 0x80000;
@@ -54,18 +78,27 @@ public class CubeDevice {
 
     // ------------------------------------------------------------ básico
     private synchronized byte[] transact(byte[] packet, int expectCmd, long timeoutMs) throws Exception {
+        if (traceBytes) log("→ " + cmdName(packet[2] & 0xFF) + " pacote " + hex(packet, 24));
         link.send(CubeProtocol.toSysex(packet));
         long deadline = System.currentTimeMillis() + timeoutMs;
         while (true) {
             long left = deadline - System.currentTimeMillis();
-            if (left <= 0) throw new DeviceException("a pedaleira não respondeu (timeout)");
-            byte[] msg = link.receive(left);
-            if (msg == null) throw new DeviceException("a pedaleira não respondeu (timeout)");
+            byte[] msg = left > 0 ? link.receive(left) : null;
+            if (msg == null) {
+                log("✗ sem resposta para " + cmdName(packet[2] & 0xFF) + " em " + timeoutMs + " ms");
+                throw new DeviceException("a pedaleira não respondeu (timeout)");
+            }
             try {
                 byte[] pkt = CubeProtocol.fromSysex(msg);
-                if (pkt.length > 2 && pkt[0] == 0x59 && pkt[1] == 0 && (pkt[2] & 0xFF) == expectCmd)
-                    return CubeProtocol.parsePacket(pkt, expectCmd);
-            } catch (CubeProtocol.ProtocolException ignored) { /* outra mensagem */ }
+                if (pkt.length > 2 && pkt[0] == 0x59 && pkt[1] == 0 && (pkt[2] & 0xFF) == expectCmd) {
+                    byte[] payload = CubeProtocol.parsePacket(pkt, expectCmd);
+                    if (traceBytes) log("← " + cmdName(expectCmd) + " ok, " + payload.length + " bytes: " + hex(payload, 24));
+                    return payload;
+                }
+                log("← pacote ignorado (esperava " + cmdName(expectCmd) + "): " + hex(pkt, 24));
+            } catch (CubeProtocol.ProtocolException e) {
+                log("← mensagem não reconhecida (" + e.getMessage() + "): " + hex(msg, 32));
+            }
         }
     }
 
@@ -115,21 +148,30 @@ public class CubeDevice {
     // ------------------------------------------------------------ conexão
     public synchronized void connect() throws Exception {
         link.clear();
-        byte[] p = transact(CubeProtocol.reqIdentify(), CubeProtocol.CMD_IDENTIFY, 1500);
+        byte[] p = null;
+        for (int attempt = 1; attempt <= 3 && p == null; attempt++) {
+            log("Identificação: tentativa " + attempt + "/3");
+            try { p = transact(CubeProtocol.reqIdentify(), CubeProtocol.CMD_IDENTIFY, 1200); }
+            catch (DeviceException e) { if (attempt == 3) throw e; }
+        }
         StringBuilder nm = new StringBuilder(), ver = new StringBuilder();
         for (int i = 0; i < Math.min(16, p.length); i++) if (p[i] >= 0x20 && p[i] < 0x7F) nm.append((char) p[i]);
         for (int i = 8; i < Math.min(19, p.length); i++) if (p[i] >= 0 && p[i] < 10) ver.append((char) (p[i] + '0'));
         name = nm.toString().trim();
         version = ver.toString();
+        log("Aparelho respondeu: nome='" + name + "' versão='" + version + "'");
 
         long[] order = name.contains("looperpro1") ? new long[]{0x4180, 0x2100, 0x180}
                 : name.contains("Cuvave-IR") ? new long[]{0x180, 0x2100, 0x4180}
                 : new long[]{0x2100, 0x180, 0x4180};
         for (long addr : order) {
             byte[] info;
-            try { info = read(FLASH, addr, 20); } catch (DeviceException e) { continue; }
+            try { info = read(FLASH, addr, 20); }
+            catch (DeviceException e) { log(String.format("Bloco de info em 0x%X: %s", addr, e.getMessage())); continue; }
             int pid = (int) CubeProtocol.getU32(info, 4);
             int gen = generationOf(pid);
+            log(String.format("Bloco de info em 0x%X: %s → ID 0x%04X (%s)", addr, hex(info, 20), pid,
+                    gen < 0 ? "desconhecido" : modelOf(pid)));
             if (gen >= 0) {
                 productId = pid;
                 generation = gen;

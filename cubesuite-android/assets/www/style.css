@@ -34,6 +34,7 @@ h2 { font-size: 1rem; }
 .brand { font-size: 1.15rem; letter-spacing: .3px; }
 .brand b { color: var(--accent); margin-right: 1px; }
 .logo { color: var(--accent); margin-right: .4rem; }
+.top-actions { display: flex; gap: .4rem; }
 .chip { display: inline-flex; align-items: center; gap: .45rem; border: 1px solid var(--line); background: var(--panel);
   color: var(--text); border-radius: 999px; padding: .4rem .8rem; font: inherit; font-size: .85rem; }
 .chip i { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
@@ -131,6 +132,17 @@ canvas { width: 100%; height: 120px; margin-top: .6rem; background: #0d1014; bor
 .bottom button { border: 0; background: transparent; color: var(--muted); font: inherit; font-size: .78rem; font-weight: 700; padding: .55rem 0 .65rem; }
 .bottom button span { display: block; font-size: 1.35rem; }
 .bottom button.active { color: var(--accent); }
+
+/* log */
+.log-panel { position: fixed; inset: 0; z-index: 25; background: var(--bg); display: flex; flex-direction: column;
+  padding: .8rem 1rem calc(.8rem + env(safe-area-inset-bottom)); }
+.log-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: .4rem; font-size: 1.1rem; }
+.log-tools { display: grid; grid-template-columns: 1fr 1fr; gap: .45rem; }
+.log-tools .btn { margin: 0; padding: .7rem .4rem; font-size: .9rem; }
+.check { display: flex; gap: .5rem; align-items: center; color: var(--muted); font-size: .85rem; margin: .45rem 0 0; }
+#logView { flex: 1; overflow: auto; margin: .6rem 0 0; padding: .6rem; background: #07090b; border: 1px solid var(--line);
+  border-radius: 12px; font: 11.5px/1.45 ui-monospace, "Roboto Mono", monospace; color: #b8c4cf;
+  white-space: pre-wrap; word-break: break-all; user-select: text; }
 
 /* avisos */
 .toast { position: fixed; left: 1rem; right: 1rem; bottom: calc(86px + env(safe-area-inset-bottom)); z-index: 20;

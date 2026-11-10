@@ -12,8 +12,20 @@ em tempo real, sem precisar se abaixar. Usa o mesmo protocolo descoberto para o 
 - USB Loopback, ler presets da pedaleira, restaurar presets de fábrica.
 - A tela **não apaga** enquanto o app está aberto (bom para palco/ensaio).
 
+## 🔌 Como o app se conecta (versão 1.1)
+1. **MIDI do Android** — testa todos os aparelhos MIDI e todas as portas de cada um.
+2. **USB direto** (plano B) — se o celular não listar a pedaleira como MIDI, o app fala direto com o
+   USB (pacotes USB-MIDI de 4 bytes). O Android pode pedir **permissão USB**: toque em *Permitir*.
+
+## 📋 Log
+Botão **📋 Log** no topo (também na tela “Conecte a Cube Baby”):
+- mostra cada passo da conexão e cada pacote enviado (TX) e recebido (RX), ao vivo;
+- **🔍 Diagnóstico** lista tudo que o celular enxerga (aparelhos MIDI, USB, interfaces, endpoints, permissões);
+- **📤 Compartilhar** envia o log por WhatsApp/e-mail; **📄 Copiar** copia para a área de transferência;
+- o log também é salvo no arquivo interno `cuberemote.log` (até 1 MB).
+
 ## 📲 Instalar
-1. Copie `CubeRemote-1.0.0.apk` para o celular e abra o arquivo.
+1. Copie `CubeRemote-1.1.0.apk` para o celular e abra o arquivo.
 2. Permita “instalar apps de fontes desconhecidas” quando o Android pedir.
 3. Ligue a pedaleira no celular com **cabo USB + adaptador OTG** e abra o **Cube Remote**.
 
@@ -26,7 +38,7 @@ Precisa de Java (JDK 17+) e do Android SDK com `platforms;android-34` e `build-t
 
 ```bash
 sdkmanager "platforms;android-34" "build-tools;35.0.0"
-ANDROID_HOME=~/android-sdk ./build.sh        # gera dist/CubeRemote-1.0.0.apk
+ANDROID_HOME=~/android-sdk ./build.sh        # gera dist/CubeRemote-1.1.0.apk
 ```
 
 A assinatura usa `~/.cuberemote.jks` (criada na primeira vez). **Guarde esse arquivo:** para
@@ -39,7 +51,10 @@ cubesuite-android/
 ├── assets/www/                  → INTERFACE (edite aqui): index.html, style.css, app.js
 ├── src/com/jrtechofc/cuberemote/
 │   ├── MainActivity.java        → tela + ponte JavaScript ↔ pedaleira, busca automática do USB
-│   ├── MidiLink.java            → envio/recepção SysEx pelo android.media.midi
+│   ├── MidiLink.java            → método 1: SysEx pelo android.media.midi
+│   ├── UsbRawLink.java          → método 2: USB direto (pacotes USB-MIDI)
+│   ├── SysexAssembler.java      → junta os pedaços recebidos em mensagens SysEx
+│   ├── AppLog.java              → sistema de log (tela + arquivo)
 │   ├── CubeDevice.java          → operações (presets, IR, loopback) — mesmo mapa de memória do PC
 │   └── CubeProtocol.java        → formato das mensagens (7 bits, pacote 59 00, checksum)
 ├── res/                         → ícone, tema escuro, filtro USB
@@ -64,4 +79,5 @@ cubesuite-android/
 |---|---|
 | “Nenhum aparelho MIDI encontrado” | Confira o adaptador OTG e o cabo (precisa passar dados). Em alguns celulares é preciso ativar “OTG” nas configurações. |
 | Android pergunta qual app usar | Escolha **Cube Remote** (e “sempre”, se quiser que abra sozinho ao plugar). |
+| Não conectou | Abra **📋 Log → 🔍 Diagnóstico → 📤 Compartilhar** e envie o texto. |
 | Conectou, mas os knobs não respondem | Feche outros apps MIDI e toque em **Mais → Reconectar**. |

@@ -42,6 +42,30 @@ window.cubeResolve = (id, ok, data) => {
 };
 window.cubeEvent = (name, data) => { if (name === "status") applyStatus(data); };
 
+/* ======================= LOG ======================= */
+const LOG_MAX = 200000;           // caracteres mantidos na tela
+window.cubeLog = (chunk) => {
+  const v = $("#logView");
+  let t = v.textContent + chunk;
+  if (t.length > LOG_MAX) t = t.slice(t.length - LOG_MAX);
+  v.textContent = t;
+  if ($("#logFollow").checked) v.scrollTop = v.scrollHeight;
+};
+async function openLog() {
+  $("#logPanel").classList.remove("hidden");
+  try { $("#logView").textContent = await native("getLog"); } catch (_) {}
+  $("#logView").scrollTop = $("#logView").scrollHeight;
+}
+function initLog() {
+  ["#btnLog", "#btnOpenLog", "#btnOpenLog2"].forEach((s) => $(s).onclick = openLog);
+  $("#logClose").onclick = () => $("#logPanel").classList.add("hidden");
+  $("#logDiag").onclick = () => native("diag");
+  $("#logShare").onclick = () => native("shareLog");
+  $("#logCopy").onclick = () => native("copyLog").then(() => toast("Log copiado"));
+  $("#logClear").onclick = () => { $("#logView").textContent = ""; native("clearLog"); };
+  $("#logTrace").onchange = (e) => native("setTrace", { on: e.target.checked });
+}
+
 function native(method, args = {}) {
   return new Promise((resolve, reject) => {
     const id = "c" + nextId++;
@@ -91,7 +115,7 @@ function applyStatus(st) {
     <dt>Nome interno</dt><dd>${esc(st.name || "—")}</dd>
     <dt>Firmware</dt><dd>${esc(st.version || "—")}</dd>
     <dt>ID</dt><dd>${esc(st.productId)}</dd>
-    <dt>USB</dt><dd>${esc(st.device || "—")}</dd></dl>`;
+    <dt>Conexão</dt><dd>${esc(st.device || "—")}</dd></dl>`;
 }
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
@@ -243,6 +267,7 @@ function updateSaveBtn() {
 
 /* ======================= início ======================= */
 function init() {
+  initLog();
   $("#btnConnect").onclick = () => native("connect");
   $("#btnReconnect").onclick = () => native("connect");
   $("#statusChip").onclick = () => { if (!S.st || S.st.state !== "on") native("connect"); };
@@ -309,6 +334,8 @@ const Mock = {
       else if (m === "param") { this.presets[a.preset][a.offset] = a.value; this.log.push(a); }
       else if (m === "presets") r = this.presets;
       else if (m === "loopback") r = this.loop = a.on;
+      else if (m === "getLog") r = this.log.map((x) => "param " + JSON.stringify(x)).join("\n") + "\n";
+      if (m !== "getLog" && window.cubeLog) window.cubeLog("[simulador] " + m + " " + json + "\n");
       window.cubeResolve(id, true, r);
     }, 30);
   },
