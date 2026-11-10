@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Cube Remote: controle da pedaleira Cube Baby pelo cabo USB (OTG) -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.jrtechofc.cuberemote">
+
+    <!-- MIDI do Android (Android 6+) e modo USB host (OTG) -->
+    <uses-feature android:name="android.software.midi" android:required="true" />
+    <uses-feature android:name="android.hardware.usb.host" android:required="false" />
+
+    <application
+        android:label="@string/app_name"
+        android:icon="@mipmap/ic_launcher"
+        android:theme="@style/AppTheme"
+        android:allowBackup="false">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- Abre o app ao plugar um aparelho USB-MIDI -->
+            <intent-filter>
+                <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
+                android:resource="@xml/usb_midi" />
+        </activity>
+    </application>
+</manifest>

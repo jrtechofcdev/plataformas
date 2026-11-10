@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <title>Cube Remote</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- ============ TOPO ============ -->
+  <header class="top">
+    <div class="brand"><span class="logo">◉</span><b>Cube</b>Remote</div>
+    <button id="statusChip" class="chip off"><i></i><span>Desconectada</span></button>
+  </header>
+
+  <!-- ============ TELA: SEM CONEXÃO ============ -->
+  <section id="screenOff" class="screen">
+    <div class="hero">
+      <div class="hero-icon">🎸</div>
+      <h1 id="offTitle">Conecte a Cube Baby</h1>
+      <p id="offMsg">Ligue a pedaleira no celular com um cabo USB + adaptador OTG.
+        O app encontra a pedaleira sozinho.</p>
+      <button id="btnConnect" class="btn primary big">🔌 Conectar</button>
+      <ul class="tips">
+        <li>Use um adaptador <b>OTG</b> (USB-C ou micro-USB) que passe dados, não só carga.</li>
+        <li>Se o Android perguntar qual app abrir para o aparelho USB, escolha <b>Cube Remote</b>.</li>
+        <li>Feche outros apps de música/MIDI que possam estar usando a pedaleira.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ============ TELA: CONTROLES ============ -->
+  <section id="screenMain" class="screen hidden">
+    <!-- Aba 1: controles ao vivo -->
+    <div id="tabLive" class="tab-body">
+      <div id="presetSeg" class="seg"></div>
+      <div id="blocks" class="blocks"></div>
+      <div id="params"></div>
+      <p id="oldGen" class="note hidden">Esta Cube Baby é da geração antiga: ela não tem presets editáveis
+        pelo USB. Use a aba <b>IR</b> para trocar os IRs.</p>
+    </div>
+
+    <!-- Aba 2: IR -->
+    <div id="tabIr" class="tab-body hidden">
+      <div class="card">
+        <h2>Carregar IR (.wav)</h2>
+        <label class="pick">
+          <input id="wavInput" type="file" accept=".wav,audio/*" hidden>
+          <span>📂 Escolher arquivo .wav</span>
+        </label>
+        <div id="irBox" class="hidden">
+          <div class="row"><b id="irName"></b><small id="irMeta"></small></div>
+          <canvas id="irWave" width="800" height="200"></canvas>
+        </div>
+        <p class="note">O IR toca na pedaleira assim que você escolhe (prévia, não salva).</p>
+      </div>
+      <div class="card">
+        <div class="row"><h2>Distância do microfone</h2><b id="distVal" class="val">50%</b></div>
+        <input id="distance" type="range" min="1" max="100" value="50">
+      </div>
+      <div class="card">
+        <h2>Salvar na memória</h2>
+        <div id="slotGrid" class="slots"></div>
+        <button id="btnSaveIr" class="btn primary big" disabled>💾 Salvar IR no slot 1</button>
+      </div>
+    </div>
+
+    <!-- Aba 3: mais opções -->
+    <div id="tabMore" class="tab-body hidden">
+      <div class="card info" id="devInfo"></div>
+      <div class="card gen2only">
+        <div class="row">
+          <div><h2>USB Loopback</h2><p class="note">Toca o áudio que vem pelo USB na saída da pedaleira.</p></div>
+          <label class="switch"><input id="loopback" type="checkbox"><span></span></label>
+        </div>
+      </div>
+      <div class="card gen2only">
+        <h2>Presets</h2>
+        <button id="btnReload" class="btn">↻ Ler presets da pedaleira</button>
+        <button id="btnFactory" class="btn danger">Restaurar presets de fábrica</button>
+      </div>
+      <div class="card">
+        <button id="btnReconnect" class="btn">🔌 Reconectar</button>
+      </div>
+      <p class="foot">Cube Remote 1.0 · projeto independente, sem vínculo com o fabricante</p>
+    </div>
+
+    <!-- barra de navegação inferior -->
+    <nav class="bottom">
+      <button data-tab="tabLive" class="active"><span>🎛️</span>Controles</button>
+      <button data-tab="tabIr"><span>🔊</span>IR</button>
+      <button data-tab="tabMore"><span>⚙️</span>Mais</button>
+    </nav>
+  </section>
+
+  <div id="toast" class="toast hidden"></div>
+  <div id="busy" class="busy hidden"><div class="spinner"></div><p id="busyText">Aguarde…</p></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
