@@ -1,0 +1,60 @@
+/* Cube Remote · Copyright (c) 2026 José Renato · Jr_Tech_OFC. Todos os direitos reservados.
+   Tokens de design. Para mudar cores, fontes ou tamanhos, edite só este arquivo (veja DESIGN.md). */
+
+@font-face { font-family: "Barlow Condensed"; font-weight: 500; font-display: block; src: url(../fonts/barlow-condensed-latin-500-normal.woff2) format("woff2"); }
+@font-face { font-family: "Barlow Condensed"; font-weight: 600; font-display: block; src: url(../fonts/barlow-condensed-latin-600-normal.woff2) format("woff2"); }
+@font-face { font-family: "Barlow Condensed"; font-weight: 700; font-display: block; src: url(../fonts/barlow-condensed-latin-700-normal.woff2) format("woff2"); }
+@font-face { font-family: "Barlow"; font-weight: 400; font-display: block; src: url(../fonts/barlow-latin-400-normal.woff2) format("woff2"); }
+@font-face { font-family: "Barlow"; font-weight: 500; font-display: block; src: url(../fonts/barlow-latin-500-normal.woff2) format("woff2"); }
+@font-face { font-family: "Barlow"; font-weight: 600; font-display: block; src: url(../fonts/barlow-latin-600-normal.woff2) format("woff2"); }
+
+:root {
+  /* app */
+  --bg: #0b0d10;
+  --surface: #14171c;
+  --surface-2: #1b1f26;
+  --surface-3: #232831;
+  --line: #2b313b;
+  --line-strong: #3a424f;
+  --text: #ecf0f4;
+  --text-2: #b4bec9;
+  --muted: #8d99a6;
+  --brand: #33eab8;
+  --brand-ink: #04130e;
+  --danger: #ff6b5e;
+  --warn: #f2c14e;
+
+  /* pedaleira */
+  --panel-top: #18191c;
+  --panel-bottom: #0e0f11;
+  --silk: #ecebe6;
+  --silk-dim: #9c9b96;
+  --led-white: #eef3ff;
+  --led-green: #38e27c;
+  --led-blue: #3f8cff;
+  --led-red: #ff4436;
+  --led-off: #2c2f34;
+  --skirt-1: #dcd8cf;
+  --skirt-2: #a8a49b;
+  --metal-1: #e3e5e8;
+  --metal-2: #7d838b;
+
+  /* tipografia */
+  --font-label: "Barlow Condensed", "Roboto Condensed", system-ui, sans-serif;
+  --font-body: "Barlow", system-ui, Roboto, sans-serif;
+
+  /* medidas */
+  --header-h: 52px;
+  --nav-h: 62px;
+  --rail-w: 76px;
+  --gap: 10px;
+  --radius: 14px;
+  --radius-sm: 10px;
+  --tap: 44px;
+
+  color-scheme: dark;
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+  :root { --header-h: 44px; --gap: 8px; }
+}

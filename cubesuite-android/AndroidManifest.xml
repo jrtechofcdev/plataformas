@@ -6,6 +6,10 @@
     <!-- MIDI do Android (Android 6+) e modo USB host (OTG) -->
     <uses-feature android:name="android.software.midi" android:required="true" />
     <uses-feature android:name="android.hardware.usb.host" android:required="false" />
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
+
+    <!-- Afinador: ouvir a guitarra pelo microfone ou pela entrada USB da pedaleira -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <application
         android:label="@string/app_name"

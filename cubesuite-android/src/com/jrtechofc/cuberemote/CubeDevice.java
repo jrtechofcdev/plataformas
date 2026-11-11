@@ -1,3 +1,6 @@
+/*
+ * Cube Remote · Copyright (c) 2026 José Renato · Jr_Tech_OFC. Todos os direitos reservados.
+ */
 package com.jrtechofc.cuberemote;
 
 import java.io.ByteArrayOutputStream;
@@ -95,7 +98,7 @@ public class CubeDevice {
             long left = deadline - System.currentTimeMillis();
             byte[] msg = left > 0 ? link.receive(left) : null;
             if (msg == null) {
-                log("✗ sem resposta para " + cmdName(packet[2] & 0xFF) + " em " + timeoutMs + " ms");
+                log("FALHA: sem resposta para " + cmdName(packet[2] & 0xFF) + " em " + timeoutMs + " ms");
                 throw new DeviceException("a pedaleira não respondeu (timeout)");
             }
             try {

@@ -1,93 +1,87 @@
-# 📱 Cube Remote — controle da Cube Baby pelo celular (Android)
+# Cube Remote · by Jr_Tech_OFC
 
-App Android simples para mexer na pedaleira **Cuvave / M-VAVE Cube Baby** pelo **cabo USB (OTG)**,
-em tempo real, sem precisar se abaixar. Usa o mesmo protocolo descoberto para o CubeSuite Linux
-(pasta `../cubesuite-linux`).
+App Android para controlar a pedaleira **Cube Baby** pelo cabo USB (OTG), em tempo real,
+em pé ou deitado. Criado do zero por José Renato (Jr_Tech_OFC).
+© 2026 José Renato · Jr_Tech_OFC. Todos os direitos reservados (veja `LICENSE`).
 
-## ✨ Funções
-- Presets **A / B / C**: VOLUME, IR CAB, REVERB, MIX, FB, TIME, MOD, TONE, GAIN, TYPE
-  (sliders grandes + botões − / +). Cada toque vai **na hora** para a pedaleira.
-- Liga/desliga dos blocos **A (IR/Reverb)**, **B (Delay/Mod)** e **C (Amp)** em botões grandes.
-- IR: escolher `.wav`, ouvir a prévia, ajustar a distância do microfone e salvar em 1 dos 8 slots.
-- USB Loopback, ler presets da pedaleira, restaurar presets de fábrica.
-- A tela **não apaga** enquanto o app está aberto (bom para palco/ensaio).
+## Funções (versão 2.0)
+- **Tela Pedal**: réplica do painel com os nomes e cores da pedaleira (VOLUME branco; IR CAB e
+  REVERB verdes; MIX, FB, TIME e MOD azuis; TONE, GAIN e TYPE vermelhos). Nunca rola a tela.
+  - Em pé: footswitches à esquerda e knobs em coluna, como a pedaleira em pé.
+  - Deitado: knobs em linha e footswitches embaixo, como a pedaleira no chão.
+  - **Knobs ou sliders** (Ajustes). O valor só muda depois de um arrasto curto; um toque simples
+    abre o ajuste fino (slider grande, botões − e +, chave ativo/zerado).
+  - **Chave ativo/zerado** em cada controle; o MOD zera no centro (manual do fabricante).
+  - **Footswitch A, B, C**: toque escolhe o preset em edição (LED verde, azul, vermelho).
+  - **Módulos 1, 2 e 3** (IR CAB/REVERB, DELAY/MOD, AMP) com chave liga/desliga por preset.
+  - Botão **"!"** em cada controle e footswitch: o que é, como usar, com o que combina.
+  - **Afinador** na própria tela: os LEDs dos knobs acendem como no afinador da pedaleira
+    (E A D G B E e indicadores baixo/afinado/alto), com nota, cents e Hz precisos.
+    Fonte: microfone do celular ou entrada de áudio USB da pedaleira (experimental).
+  - Desfazer, Enviar preset completo e **trava de palco** (segurar o cadeado 1 s para destravar).
+- **Aprender**: todos os controles, módulos e combinações, os 9 modelos do TYPE e os 9 gabinetes do
+  IR CAB com número e nome do manual, os modos da pedaleira e receitas aplicáveis com um toque.
+- **Ferramentas**: metrônomo com tap tempo, importação de IR (.wav), presets e USB Loopback.
+- **Ajustes**: estilo dos controles, orientação, vibração, afinador, conexão, log e Sobre.
 
-## ✅ Protocolo confirmado (versão 1.3)
-O teste da v1.2 na pedaleira real (Samsung A16, Android 16, Cube Baby USB `301A:5555`) mostrou que:
-- o cabeçalho dos pacotes é **`00 59`** (não `59 00`);
-- a pedaleira se identifica como **`SINCO-CubeBaby`**;
-- no celular testado, as respostas só chegam pelo **USB direto** — por isso ele é tentado primeiro.
+## Instalar
+1. Copie `CubeRemote-2.0.0.apk` para o celular e abra (permita "fontes desconhecidas").
+   Instala por cima das versões anteriores (mesma chave de assinatura).
+2. Ligue a pedaleira com cabo USB + adaptador OTG. O app conecta sozinho.
+3. Na primeira vez que abrir o afinador, permita o uso do microfone.
 
-## 🔌 Como o app se conecta
-1. **MIDI do Android** — testa todos os aparelhos MIDI e todas as portas de cada um.
-2. **USB direto** (plano B) — se o celular não listar a pedaleira como MIDI, o app fala direto com o
-   USB (pacotes USB-MIDI de 4 bytes). O Android pode pedir **permissão USB**: toque em *Permitir*.
+Requisitos: Android 6.0 ou mais novo com USB OTG.
 
-## 📋 Log
-Botão **📋 Log** no topo (também na tela “Conecte a Cube Baby”):
-- mostra cada passo da conexão e cada pacote enviado (TX) e recebido (RX), ao vivo;
-- **🔍 Diagnóstico** lista tudo que o celular enxerga (aparelhos MIDI, USB, interfaces, endpoints, permissões);
-- **📤 Compartilhar** envia o log por WhatsApp/e-mail; **📄 Copiar** copia para a área de transferência;
-- o log também é salvo no arquivo interno `cuberemote.log` (até 1 MB).
-- **🧪 Testar protocolos** (v1.2): envia 9 variantes de identificação (formato do PC `59 00`,
-  formato do app novo do fabricante `00 59`, com/sem empacotamento 7 bits, identidade MIDI
-  universal, fluxo bruto) pelo MIDI Android e pelo USB direto, e mostra um resumo de quais responderam;
-- **🎧 Monitorar 30 s**: registra tudo que a pedaleira enviar enquanto você mexe nela.
+## Protocolo (confirmado na pedaleira real)
+Cabeçalho `00 59`, comandos 0x11 (identificar), 0x21, 0x22, 0x23, SysEx com empacotamento de 7 bits,
+via USB direto (pacotes USB-MIDI). A pedaleira se identifica como `SINCO-CubeBaby`.
+Presets na região 5 (16 bytes por preset): TYPE, GAIN, TONE, REVERB, FB, VOLUME, TIME, MIX, MOD,
+IR CAB e os módulos 1, 2 e 3 nos bytes 10, 11 e 12.
 
-## 📲 Instalar
-1. Copie `CubeRemote-1.4.0.apk` para o celular e abra o arquivo.
-2. Permita “instalar apps de fontes desconhecidas” quando o Android pedir.
-3. Ligue a pedaleira no celular com **cabo USB + adaptador OTG** e abra o **Cube Remote**.
-
-Requisitos: **Android 6.0 ou mais novo**, com suporte a USB OTG (quase todos os celulares atuais).
-
-> *Dica:* o celular alimenta a pedaleira pelo OTG, então a bateria do celular gasta um pouco mais.
-
-## 🛠️ Gerar o APK (sem Android Studio)
-Precisa de Java (JDK 17+) e do Android SDK com `platforms;android-34` e `build-tools;35.0.0`:
-
+## Gerar o APK (sem Android Studio)
 ```bash
 sdkmanager "platforms;android-34" "build-tools;35.0.0"
-ANDROID_HOME=~/android-sdk ./build.sh        # gera dist/CubeRemote-1.4.0.apk
+ANDROID_HOME=~/android-sdk ./build.sh        # gera dist/CubeRemote-2.0.0.apk
 ```
+A assinatura usa `~/.cuberemote.jks`. Guarde esse arquivo: sem ele, uma versão nova não instala por cima.
 
-A assinatura usa `~/.cuberemote.jks` (criada na primeira vez). **Guarde esse arquivo:** para
-atualizar o app sem desinstalar, o APK novo precisa da mesma chave.
-
-## 📁 Organização
+## Organização
 ```
 cubesuite-android/
-├── AndroidManifest.xml          → nome do app, permissões (MIDI/USB), abrir ao plugar a pedaleira
-├── assets/www/                  → INTERFACE (edite aqui): index.html, style.css, app.js
+├── DESIGN.md                 direção visual (cores, fontes, ícones, regras de toque)
+├── LICENSE                   direitos autorais e licenças de terceiros (fontes)
+├── assets/www/               INTERFACE
+│   ├── index.html
+│   ├── css/tokens.css        cores, fontes e medidas (edite aqui para mudar o visual)
+│   ├── css/app.css           layout (em pé e deitado)
+│   ├── js/model.js           controles da pedaleira, nomes do TYPE e IR CAB, envio, desfazer
+│   ├── js/controls.js        knob e slider
+│   ├── js/pedal.js           tela Pedal, ajuste fino e botão "!"
+│   ├── js/tuner.js           afinador
+│   ├── js/learn-data.js      textos da aba Aprender e dos botões "!"
+│   ├── js/learn.js, tools.js, settings.js, app.js, icons.js, bridge.js
+│   └── fonts/                Barlow e Barlow Condensed (SIL OFL)
 ├── src/com/jrtechofc/cuberemote/
-│   ├── MainActivity.java        → tela + ponte JavaScript ↔ pedaleira, busca automática do USB
-│   ├── MidiLink.java            → método 1: SysEx pelo android.media.midi
-│   ├── UsbRawLink.java          → método 2: USB direto (pacotes USB-MIDI)
-│   ├── SysexAssembler.java      → junta os pedaços recebidos em mensagens SysEx
-│   ├── AppLog.java              → sistema de log (tela + arquivo)
-│   ├── CubeDevice.java          → operações (presets, IR, loopback) — mesmo mapa de memória do PC
-│   └── CubeProtocol.java        → formato das mensagens (7 bits, pacote 59 00, checksum)
-├── res/                         → ícone, tema escuro, filtro USB
-├── tests/                       → teste do Java contra o simulador Python da versão PC
-└── build.sh                     → compila e assina o APK
+│   ├── MainActivity.java     tela, ponte JavaScript, conexão, afinador, orientação
+│   ├── CubeDevice.java       operações da pedaleira
+│   ├── CubeProtocol.java     formato das mensagens
+│   ├── MidiLink.java / UsbRawLink.java / SysexAssembler.java   transporte USB
+│   ├── PitchDetector.java    detecção de nota (YIN)
+│   ├── TunerEngine.java      gravação de áudio do afinador
+│   └── AppLog.java           log
+├── tests/                    testes no computador (protocolo e afinador)
+└── build.sh                  compila e assina o APK
 ```
 
-### ✏️ Personalizar
-- **Cores:** `assets/www/style.css`, bloco `:root` (ex.: `--accent: #33eab8;`).
-- **Textos e nomes dos knobs:** `assets/www/index.html` e as listas `PARAMS` / `BLOCKS` em `assets/www/app.js`.
-- **Ver a tela no PC:** abra `assets/www/index.html` no navegador — roda um simulador.
-- Depois de editar, rode `./build.sh` de novo.
+### Personalizar
+- Cores e fontes: `assets/www/css/tokens.css`.
+- Nomes e textos explicativos: `assets/www/js/model.js` e `assets/www/js/learn-data.js`.
+- Ver a interface no computador: abra `assets/www/index.html` no Chrome (roda com um simulador).
 
-## ✅ Testes
-- `CubeDevice`/`CubeProtocol` (Java) testados contra o simulador da versão PC:
-  `javac -d /tmp/t src/com/jrtechofc/cuberemote/Cube*.java tests/DeviceTest.java && java -cp /tmp/t DeviceTest tests/sim_bridge.py`
-- Interface testada em tela de celular (Chromium, Pixel 7).
-- **Ainda não testado num celular real com a pedaleira.**
-
-## 🩺 Problemas comuns
-| Situação | O que fazer |
-|---|---|
-| “Nenhum aparelho MIDI encontrado” | Confira o adaptador OTG e o cabo (precisa passar dados). Em alguns celulares é preciso ativar “OTG” nas configurações. |
-| Android pergunta qual app usar | Escolha **Cube Remote** (e “sempre”, se quiser que abra sozinho ao plugar). |
-| Não conectou | Abra **📋 Log → 🔍 Diagnóstico → 📤 Compartilhar** e envie o texto. |
-| Conectou, mas os knobs não respondem | Feche outros apps MIDI e toque em **Mais → Reconectar**. |
+## Testes
+```bash
+J=~/android-sdk/platforms/android-34/android.jar
+javac -cp $J -d /tmp/t src/com/jrtechofc/cuberemote/{CubeProtocol,CubeDevice,SysexAssembler,UsbRawLink,PitchDetector}.java tests/*.java
+java -cp /tmp/t:$J DeviceTest tests/sim_bridge.py     # protocolo contra o simulador da versão PC
+java -cp /tmp/t PitchDetectorTest                     # afinador: erro máximo < 1 cent
+```

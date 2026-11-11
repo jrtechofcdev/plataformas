@@ -1,6 +1,12 @@
+/*
+ * Cube Remote · Copyright (c) 2026 José Renato · Jr_Tech_OFC. Todos os direitos reservados.
+ */
 package com.jrtechofc.cuberemote;
 
+import android.Manifest;
 import android.app.Activity;
+import android.content.pm.ActivityInfo;
+import android.view.HapticFeedbackConstants;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.ClipData;
@@ -48,10 +54,10 @@ import java.util.concurrent.TimeUnit;
  *   1) MIDI do Android (MidiManager) — testa todas as portas de cada aparelho MIDI;
  *   2) USB direto (UsbManager) — plano B quando o celular não lista a pedaleira como MIDI.
  *
- * Tudo é registrado no log (AppLog), visível no botão 📋 do app.
+ * Tudo é registrado no log (AppLog), visível em Ajustes > Log.
  */
 public class MainActivity extends Activity {
-    static final String VERSION = "1.4.0";
+    static final String VERSION = "2.0.0";
     private static final int PICK_FILE = 41;
     private static final String ACTION_USB_PERMISSION = "com.jrtechofc.cuberemote.USB_PERMISSION";
 
@@ -69,6 +75,13 @@ public class MainActivity extends Activity {
     private String cubeUsbName = null;
     private volatile boolean connecting = false;
     private ValueCallback<Uri[]> fileCallback;
+
+    // afinador
+    private static final int REQ_MIC = 42;
+    private TunerEngine tuner;
+    private String pendingTunerSource = null;
+    private boolean tunerWanted = false;
+    private String tunerSource = "mic";
 
     // linhas de log que ainda vão para a tela (mandadas em lote, a cada 250 ms)
     private final StringBuilder pendingLog = new StringBuilder();
@@ -139,6 +152,67 @@ public class MainActivity extends Activity {
             }
         }, f, true);
         handleUsbIntent(getIntent());
+
+        tuner = new TunerEngine(this, new TunerEngine.Listener() {
+            @Override public void onPitch(double hz, double clarity, double rms) {
+                js(String.format(java.util.Locale.US, "window.cubePitch&&window.cubePitch(%.3f,%.3f,%.4f)", hz, clarity, rms));
+            }
+            @Override public void onError(String message) {
+                log.log("Afinador: " + message);
+                js("window.cubeTunerError&&window.cubeTunerError(" + JSONObject.quote(message) + ")");
+            }
+        });
+    }
+
+    // ================================================================ afinador
+    private void startTuner(String source) {
+        tunerWanted = true;
+        tunerSource = source;
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            pendingTunerSource = source;
+            requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, REQ_MIC);
+            return;
+        }
+        String used = tuner.start(source);
+        log.log("Afinador ligado (" + (used.isEmpty() ? "falhou" : used.equals("usb") ? "entrada USB" : "microfone") + ")");
+        js("window.cubeTunerState&&window.cubeTunerState(" + JSONObject.quote(used) + ")");
+    }
+
+    private void stopTuner() {
+        tunerWanted = false;
+        tuner.stop();
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int req, String[] perms, int[] res) {
+        super.onRequestPermissionsResult(req, perms, res);
+        if (req != REQ_MIC) return;
+        String src = pendingTunerSource;
+        pendingTunerSource = null;
+        if (res.length > 0 && res[0] == PackageManager.PERMISSION_GRANTED && src != null) startTuner(src);
+        else js("window.cubeTunerError&&window.cubeTunerError(" + JSONObject.quote(
+                "O afinador precisa da permissão de microfone. Toque em Ligar afinador e permita.") + ")");
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (tuner != null && tuner.isRunning()) tuner.stop();   // não grava áudio com o app em segundo plano
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (tunerWanted && tuner != null && !tuner.isRunning()
+                && checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED)
+            tuner.start(tunerSource);
+    }
+
+    private void applyOrientation(String mode) {
+        int o = "portrait".equals(mode) ? ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+                : "landscape".equals(mode) ? ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                : ActivityInfo.SCREEN_ORIENTATION_FULL_USER;
+        main.post(() -> setRequestedOrientation(o));
     }
 
     @Override
@@ -201,8 +275,8 @@ public class MainActivity extends Activity {
         if (tryUsbDirect()) return;
         if (tryMidiManager()) return;
 
-        log.log("✗ Pedaleira NÃO encontrada. Toque em 📋 → Compartilhar e envie este log.");
-        event("status", status("off", "Pedaleira não encontrada.\nToque em 📋 Log para ver os detalhes e compartilhar."));
+        log.log("FALHA: Pedaleira NÃO encontrada. Abra Ajustes > Log e toque em Compartilhar.");
+        event("status", status("off", "Pedaleira não encontrada.\nAbra Ajustes > Log para ver os detalhes."));
     }
 
     /** Método 1: sistema MIDI do Android. */
@@ -218,7 +292,7 @@ public class MainActivity extends Activity {
             log.log("  • " + describe(info));
             if (info.getInputPortCount() < 1 || info.getOutputPortCount() < 1) { log.log("    (sem par entrada/saída — pulando)"); continue; }
             MidiDevice dev = openDevice(info);
-            if (dev == null) { log.log("    ✗ não abriu (openDevice retornou nada em 5 s)"); continue; }
+            if (dev == null) { log.log("    FALHA: não abriu (openDevice retornou nada em 5 s)"); continue; }
             for (int in = 0; in < info.getInputPortCount(); in++) {
                 MidiLink l = null;
                 try {
@@ -231,7 +305,7 @@ public class MainActivity extends Activity {
                     connected();
                     return true;
                 } catch (Exception e) {
-                    log.log("    ✗ porta " + in + ": " + e.getMessage());
+                    log.log("    FALHA: porta " + in + ": " + e.getMessage());
                     if (l != null) l.close();
                 }
             }
@@ -264,7 +338,7 @@ public class MainActivity extends Activity {
                     connected();
                     return true;
                 } catch (Exception e) {
-                    log.log("    ✗ interface " + it.getId() + ": " + e.getMessage());
+                    log.log("    FALHA: interface " + it.getId() + ": " + e.getMessage());
                     if (l != null) l.close();
                 }
             }
@@ -296,7 +370,7 @@ public class MainActivity extends Activity {
     }
 
     private void connected() {
-        log.log("✓ CONECTADA via " + cubeSource + " — " + cube.model + String.format(" (ID 0x%04X, geração %d)", cube.productId, cube.generation));
+        log.log("OK: CONECTADA via " + cubeSource + " — " + cube.model + String.format(" (ID 0x%04X, geração %d)", cube.productId, cube.generation));
         event("status", fullState());
     }
 
@@ -411,7 +485,7 @@ public class MainActivity extends Activity {
     /** Envia várias variantes de "quem é você?" e registra quais recebem resposta. */
     private void probe() {
         disconnect();
-        event("status", status("search", "Testando protocolos… (veja o 📋 Log)"));
+        event("status", status("search", "Testando protocolos… (acompanhe no Log)"));
         boolean oldTrace = CubeDevice.traceBytes;
         CubeDevice.traceBytes = true;
         log.log("========== TESTE DE PROTOCOLOS ==========");
@@ -466,7 +540,7 @@ public class MainActivity extends Activity {
         if (!usbDone) log.log("(modo USB direto não pôde ser testado)");
         log.log("========== RESUMO ==========\n" + summary + "============================");
         CubeDevice.traceBytes = oldTrace;
-        event("status", status("off", "Teste concluído. Abra o 📋 Log e toque em Compartilhar."));
+        event("status", status("off", "Teste concluído. Abra o Log e toque em Compartilhar."));
     }
 
     /** Escuta tudo que a pedaleira mandar durante N segundos. */
@@ -489,7 +563,7 @@ public class MainActivity extends Activity {
         log.log("========== FIM DO MONITOR: " + got + " bytes recebidos ==========");
         close(l[0]);
         CubeDevice.traceBytes = oldTrace;
-        event("status", status("off", "Monitor concluído (" + got + " bytes). Compartilhe o 📋 Log."));
+        event("status", status("off", "Monitor concluído (" + got + " bytes). Compartilhe o Log."));
     }
 
     private static void close(Object link) {
@@ -596,6 +670,26 @@ public class MainActivity extends Activity {
                 case "diag": new Thread(MainActivity.this::diagnostics).start(); resolve(id, true, "null"); return;
                 case "probe": worker.execute(MainActivity.this::probe); resolve(id, true, "null"); return;
                 case "monitor": worker.execute(() -> monitor(30)); resolve(id, true, "null"); return;
+                case "tunerStart": {
+                    String src = "mic";
+                    try { src = new JSONObject(argsJson).optString("source", "mic"); } catch (Exception ignored) {}
+                    final String s = src;
+                    main.post(() -> startTuner(s));
+                    resolve(id, true, "null"); return;
+                }
+                case "tunerStop": stopTuner(); resolve(id, true, "null"); return;
+                case "audioInputs": resolve(id, true, tuner.inputs().toString()); return;
+                case "setOrientation":
+                    try { applyOrientation(new JSONObject(argsJson).optString("mode", "auto")); } catch (Exception ignored) {}
+                    resolve(id, true, "null"); return;
+                case "haptic":
+                    main.post(() -> web.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP));
+                    resolve(id, true, "null"); return;
+                case "appInfo":
+                    resolve(id, true, "{\"version\":" + JSONObject.quote(VERSION) + ",\"android\":"
+                            + JSONObject.quote(Build.VERSION.RELEASE) + ",\"device\":"
+                            + JSONObject.quote(Build.MANUFACTURER + " " + Build.MODEL) + "}");
+                    return;
                 case "setTrace":
                     try { CubeDevice.traceBytes = new JSONObject(argsJson).getBoolean("on"); } catch (Exception ignored) {}
                     log.log("Registro de bytes (TX/RX): " + (CubeDevice.traceBytes ? "ligado" : "desligado"));

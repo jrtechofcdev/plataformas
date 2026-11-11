@@ -1,3 +1,6 @@
+/*
+ * Cube Remote · Copyright (c) 2026 José Renato · Jr_Tech_OFC. Todos os direitos reservados.
+ */
 package com.jrtechofc.cuberemote;
 
 import java.io.ByteArrayOutputStream;
