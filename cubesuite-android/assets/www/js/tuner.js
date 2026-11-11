@@ -27,6 +27,7 @@ CR.Tuner = (function () {
           '<div class="tr-arrows"><span class="tr-low">Baixo, aperte</span><span class="tr-hz">-- Hz</span><span class="tr-high">Alto, afrouxe</span></div>' +
           '<div class="tr-strings">' + strings + "</div>" +
           '<p class="tr-msg" hidden></p>' +
+          '<p class="tr-note-usb" hidden></p>' +
         "</div>" +
         '<div class="tr-opts">' +
           '<div class="seg" role="group" aria-label="Fonte do som">' +
@@ -40,7 +41,7 @@ CR.Tuner = (function () {
         CR.prefs.tunerSource = b.dataset.src;
         CR.savePrefs();
         paintOpts();
-        if (active) { stop(); start(); }
+        if (active) { active = false; start(); }   // o Java troca a fonte sem desligar antes
       };
     });
     v.querySelectorAll("[data-a4]").forEach(function (b) {
@@ -123,8 +124,25 @@ CR.Tuner = (function () {
 
   CR.on("pitch", onPitch);
   CR.on("tunerError", function (m) { showMsg(m); });
+  function showNote(m) {
+    var p = $("#view-tuner .tr-note-usb");
+    if (!p) return;
+    p.hidden = !m;
+    p.textContent = m || "";
+  }
+
   CR.on("tunerState", function (src) {
-    if (src === "none") showMsg("Nenhuma entrada de áudio disponível.");
+    if (src === "usb-wait") {
+      showMsg("");
+      showNote("Preparando a entrada USB da pedaleira. Os controles ficam pausados enquanto o afinador USB estiver aberto e voltam sozinhos quando você sair desta aba.");
+    } else if (src === "usb") {
+      showNote("Entrada USB da pedaleira. Controles pausados até sair do afinador. Para afinar melhor, use um preset limpo, sem delay e sem distorção.");
+    } else if (src === "mic") {
+      showNote("");
+    } else if (src === "none" || src === "") {
+      showNote("");
+      if (src === "none") showMsg("Nenhuma entrada de áudio disponível.");
+    }
   });
 
   return { start: start, stop: stop, isActive: function () { return active; } };

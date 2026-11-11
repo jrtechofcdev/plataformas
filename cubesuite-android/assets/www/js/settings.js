@@ -5,7 +5,7 @@ var CR = window.CR || (window.CR = {});
 
 CR.Settings = (function () {
   var $ = function (s, root) { return (root || document).querySelector(s); };
-  var appInfo = { version: "2.1.0" };
+  var appInfo = { version: "2.1.1" };
 
   function seg(name, options, current) {
     return '<div class="seg" role="group" data-seg="' + name + '">' + options.map(function (o) {
@@ -24,7 +24,7 @@ CR.Settings = (function () {
 
       '<article class="card"><header class="card-head">' + CR.icon("tuner") + "<div><h2>Afinador</h2><p>Também dá para trocar na própria aba Afinador.</p></div></header>" +
         seg("tunerSource", [["mic", "Microfone"], ["usb", "Entrada USB"]], p.tunerSource) +
-        '<p class="hint" id="inputsHint">O microfone sempre funciona; aproxime o celular da guitarra ou do fone. A entrada USB usa o áudio da própria pedaleira e é experimental: alguns celulares não liberam esse áudio enquanto o app controla a pedaleira pelo mesmo cabo.</p>' +
+        '<p class="hint" id="inputsHint">O microfone sempre funciona; aproxime o celular da guitarra ou do fone. A entrada USB usa o áudio da própria pedaleira: enquanto o afinador USB estiver aberto, o app pausa os controles (o Android não deixa usar o áudio e o controle pelo mesmo cabo ao mesmo tempo) e reconecta sozinho ao sair.</p>' +
         '<div class="set-row"><div><b>Referência A4</b><span>Padrão 440 Hz.</span></div><div class="stepper"><button class="step" type="button" data-a4="-1" aria-label="Diminuir A4">' + CR.icon("minus") + '</button><b id="a4Val">' + p.a4 + ' Hz</b><button class="step" type="button" data-a4="1" aria-label="Aumentar A4">' + CR.icon("plus") + "</button></div></div></article>" +
 
       '<article class="card"><header class="card-head">' + CR.icon("usb") + "<div><h2>Conexão</h2><p>" + statusText(st) + "</p></div></header>" +

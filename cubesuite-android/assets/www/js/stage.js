@@ -95,6 +95,14 @@ CR.Stage = (function () {
       box.innerHTML = '<div class="state-card"><div class="spinner"></div><h2>Procurando a pedaleira</h2><p>' + CR.esc(st.message || "Verificando a conexão USB.") + "</p></div>";
       return;
     }
+    if (st.state === "tuner") {
+      box.innerHTML = '<div class="state-card">' + CR.icon("tuner", "state-ico") + "<h2>Afinador USB em uso</h2><p>" + CR.esc(st.message) + "</p>" +
+        '<div class="state-actions"><button class="btn primary big" type="button" data-act="tuner">' + CR.icon("tuner") + "<span>Abrir afinador</span></button>" +
+        '<button class="btn big" type="button" data-act="connect">' + CR.icon("plug") + "<span>Reconectar</span></button></div></div>";
+      box.querySelector('[data-act="tuner"]').onclick = function () { CR.App.go("tuner"); };
+      box.querySelector('[data-act="connect"]').onclick = function () { CR.native("connect"); };
+      return;
+    }
     if (st.state === "on") {
       box.innerHTML = '<div class="state-card"><h2>Modelo sem presets editáveis</h2><p>Esta Cube Baby é da geração antiga. Use Ferramentas para trocar os IRs.</p></div>';
       return;

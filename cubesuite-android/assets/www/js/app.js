@@ -30,8 +30,9 @@ CR.App = (function () {
     if (st.state === "on" && st.presets) CR.S.presets = st.presets;
     if (st.state !== "on") CR.S.presets = null;
     var chip = $("#btnStatus");
-    chip.className = "chip " + (st.state === "on" ? (st.mock ? "sim" : "on") : st.state === "search" ? "search" : "off");
-    chip.querySelector("span").textContent = st.state === "on" ? (st.mock ? "Simulação" : "Conectada") : st.state === "search" ? "Procurando" : "Desconectada";
+    chip.className = "chip " + (st.state === "on" ? (st.mock ? "sim" : "on") : st.state === "search" || st.state === "tuner" ? "search" : "off");
+    chip.querySelector("span").textContent = st.state === "on" ? (st.mock ? "Simulação" : "Conectada") : st.state === "search" ? "Procurando" :
+      st.state === "tuner" ? "Afinador USB" : "Desconectada";
     if (st.warning) CR.toast(st.warning, true);
     CR.Stage.showState(st);
     if (CR.S.presets) CR.Stage.refresh();

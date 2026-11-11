@@ -22,6 +22,7 @@ public class TunerEngine {
     public interface Listener {
         void onPitch(double hz, double clarity, double rms);
         void onError(String message);
+        void onInfo(String message);
     }
 
     private static final int SR = 48000, BLOCK = 4096, HOP = 2048;
@@ -49,7 +50,7 @@ public class TunerEngine {
         return out;
     }
 
-    private AudioDeviceInfo findUsbInput() {
+    public AudioDeviceInfo findUsbInput() {
         AudioManager am = (AudioManager) ctx.getSystemService(Context.AUDIO_SERVICE);
         for (AudioDeviceInfo d : am.getDevices(AudioManager.GET_DEVICES_INPUTS)) {
             int t = d.getType();
@@ -65,7 +66,9 @@ public class TunerEngine {
         if ("usb".equals(source) && usb == null) {
             listener.onError("Entrada de áudio USB da pedaleira não encontrada. Usando o microfone.");
         }
-        int audioSource = MediaRecorder.AudioSource.VOICE_RECOGNITION;   // sem controle automático de ganho
+        // microfone: VOICE_RECOGNITION (sem controle automático de ganho); USB: MIC, a fonte que todo
+        // celular aceita direcionar para um aparelho USB com setPreferredDevice
+        int audioSource = usb != null ? MediaRecorder.AudioSource.MIC : MediaRecorder.AudioSource.VOICE_RECOGNITION;
         if (usb == null && Build.VERSION.SDK_INT >= 24) {
             AudioManager am = (AudioManager) ctx.getSystemService(Context.AUDIO_SERVICE);
             if ("true".equals(am.getProperty(AudioManager.PROPERTY_SUPPORT_AUDIO_SOURCE_UNPROCESSED)))
@@ -92,19 +95,40 @@ public class TunerEngine {
         }
         activeSource = usb != null ? "usb" : "mic";
         running = true;
-        thread = new Thread(() -> loop(rec), "tuner");
+        final boolean isUsb = usb != null;
+        thread = new Thread(() -> loop(rec, isUsb), "tuner");
         thread.start();
         return activeSource;
     }
 
-    private void loop(AudioRecord rec) {
+    private void loop(AudioRecord rec, boolean isUsb) {
         PitchDetector pd = new PitchDetector(SR, BLOCK);
         short[] pcm = new short[HOP];
         float[] block = new float[BLOCK];
+        long samples = 0;
+        int peak = 0;
+        boolean reported = false;
         try {
+            AudioDeviceInfo routed = Build.VERSION.SDK_INT >= 24 ? rec.getRoutedDevice() : null;
+            listener.onInfo("gravando de " + (routed != null ? "\"" + routed.getProductName() + "\" (tipo " + routed.getType() + ")" : "dispositivo padrão")
+                    + ", " + rec.getSampleRate() + " Hz");
+            if (isUsb && routed != null && routed.getType() != AudioDeviceInfo.TYPE_USB_DEVICE
+                    && routed.getType() != AudioDeviceInfo.TYPE_USB_HEADSET)
+                listener.onError("O Android não direcionou a gravação para a pedaleira (está usando " + routed.getProductName() + ").");
             while (running) {
                 int n = rec.read(pcm, 0, HOP);
                 if (n <= 0) continue;
+                if (!reported) {
+                    for (int i = 0; i < n; i++) { int a = Math.abs(pcm[i]); if (a > peak) peak = a; }
+                    samples += n;
+                    if (samples >= SR * 3) {   // depois de 3 s, registra o nível de entrada (ajuda a diagnosticar)
+                        reported = true;
+                        double db = peak > 0 ? 20 * Math.log10(peak / 32768.0) : -120;
+                        listener.onInfo(String.format(java.util.Locale.US, "pico de entrada nos primeiros 3 s: %.1f dBFS", db));
+                        if (isUsb && peak == 0)
+                            listener.onError("A entrada USB abriu, mas não chega som. Desconecte e conecte o cabo da pedaleira com o afinador aberto.");
+                    }
+                }
                 System.arraycopy(block, n, block, 0, BLOCK - n);
                 for (int i = 0; i < n; i++) block[BLOCK - n + i] = pcm[i] / 32768f;
                 PitchDetector.Result r = pd.detect(block);

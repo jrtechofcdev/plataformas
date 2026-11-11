@@ -276,13 +276,15 @@ button { font: inherit; color: inherit; }
 .tr-str small { font: 600 10px var(--font-label); color: var(--muted); }
 .tr-str.on { border-color: var(--brand); color: var(--text); background: color-mix(in srgb, var(--brand) 16%, transparent); }
 .tr-msg { color: var(--danger); text-align: center; font-size: 14px; }
+.tr-note-usb { color: var(--text-2); text-align: center; font-size: 14px; max-width: 520px; }
 .tr-opts { display: flex; align-items: center; gap: var(--gap); }
 .tr-opts .seg { flex: 1; }
 .tr-opts .seg button { min-height: 48px; font-size: 16px; white-space: nowrap; }
 .tr-opts .stepper b { min-width: 98px; }
 @media (orientation: landscape) and (max-height: 560px) {
   .tr-display { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 32px; row-gap: 10px; align-content: center;
-    grid-template-areas: "note cents" "note meter" "note arrows" "note strings" "msg msg"; padding: 12px 24px; }
+    grid-template-areas: "note cents" "note meter" "note arrows" "note strings" "msg msg" "usb usb"; padding: 12px 24px; }
+  .tr-note-usb { grid-area: usb; justify-self: center; font-size: 13px; }
   .tr-note { grid-area: note; align-self: center; }
   .tr-letter { font-size: clamp(100px, 40dvh, 200px); }
   .tr-cents { grid-area: cents; justify-self: center; }

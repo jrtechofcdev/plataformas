@@ -18,6 +18,8 @@ import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.hardware.usb.UsbConstants;
 import android.hardware.usb.UsbDevice;
+import android.hardware.usb.UsbDeviceConnection;
+import android.media.AudioDeviceInfo;
 import android.hardware.usb.UsbEndpoint;
 import android.hardware.usb.UsbInterface;
 import android.hardware.usb.UsbManager;
@@ -57,7 +59,7 @@ import java.util.concurrent.TimeUnit;
  * Tudo é registrado no log (AppLog), visível em Ajustes > Log.
  */
 public class MainActivity extends Activity {
-    static final String VERSION = "2.1.0";
+    static final String VERSION = "2.1.1";
     private static final int PICK_FILE = 41;
     private static final String ACTION_USB_PERMISSION = "com.jrtechofc.cuberemote.USB_PERMISSION";
 
@@ -82,6 +84,10 @@ public class MainActivity extends Activity {
     private String pendingTunerSource = null;
     private boolean tunerWanted = false;
     private String tunerSource = "mic";
+    // afinador pela entrada USB: o controle da pedaleira fica pausado enquanto ele estiver aberto
+    private volatile boolean usbTunerMode = false;
+    private volatile boolean reconnectAfterTuner = false;
+    private String lastCubeUsbName = null;
 
     // linhas de log que ainda vão para a tela (mandadas em lote, a cada 250 ms)
     private final StringBuilder pendingLog = new StringBuilder();
@@ -161,6 +167,7 @@ public class MainActivity extends Activity {
                 log.log("Afinador: " + message);
                 js("window.cubeTunerError&&window.cubeTunerError(" + JSONObject.quote(message) + ")");
             }
+            @Override public void onInfo(String message) { log.log("Afinador: " + message); }
         });
     }
 
@@ -173,6 +180,18 @@ public class MainActivity extends Activity {
             requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, REQ_MIC);
             return;
         }
+        if ("usb".equals(source)) {
+            // a entrada USB só funciona com o driver de áudio do Android ligado na pedaleira (veja prepareUsbTuner)
+            tuner.stop();
+            js("window.cubeTunerState&&window.cubeTunerState(\"usb-wait\")");
+            worker.execute(this::prepareUsbTuner);
+            return;
+        }
+        if (usbTunerMode) worker.execute(this::endUsbTunerMode);
+        startTunerNow(source);
+    }
+
+    private void startTunerNow(String source) {
         String used = tuner.start(source);
         log.log("Afinador ligado (" + (used.isEmpty() ? "falhou" : used.equals("usb") ? "entrada USB" : "microfone") + ")");
         js("window.cubeTunerState&&window.cubeTunerState(" + JSONObject.quote(used) + ")");
@@ -181,6 +200,110 @@ public class MainActivity extends Activity {
     private void stopTuner() {
         tunerWanted = false;
         tuner.stop();
+        worker.execute(this::endUsbTunerMode);
+    }
+
+    /*
+     * Por que o afinador USB precisa disso:
+     * a pedaleira é UM aparelho USB com áudio (interfaces 0, 1, 2), controle MIDI (3) e MIDI (4).
+     * Para mandar os ajustes, o app toma a interface 4 do Android. Quando isso acontece o driver
+     * de áudio do Linux (snd-usb-audio) desliga a placa de som INTEIRA da pedaleira, e a entrada
+     * USB some ou fica muda. Aqui o app solta a pedaleira, devolve todas as interfaces de áudio
+     * ao Android para o driver criar a placa de novo e só então abre a gravação.
+     * Ao sair do afinador, o controle é reconectado sozinho.
+     * (Roda na fila "worker", a mesma da conexão, para nunca brigar com ela.)
+     */
+    private void prepareUsbTuner() {
+        if (!tunerWanted || !"usb".equals(tunerSource)) return;
+        log.log("---------- Afinador USB ----------");
+        if (!usbTunerMode) {
+            usbTunerMode = true;
+            UsbDevice d = findCubeUsb();
+            if (cube != null) {
+                reconnectAfterTuner = true;
+                log.log("Pausando o controle da pedaleira para liberar o áudio USB.");
+                disconnect();
+                event("status", status("tuner", "Afinador USB em uso. Os controles voltam ao sair do afinador."));
+            }
+            if (d == null) log.log("Pedaleira não encontrada na lista USB.");
+            else if (!usb.hasPermission(d)) log.log("Sem permissão USB para religar o áudio.");
+            else rebindUsbAudio(d);
+        }
+        AudioDeviceInfo in = null;
+        for (int i = 0; i < 25 && in == null; i++) { in = tuner.findUsbInput(); if (in == null) sleep(200); }
+        logAudioInputs();
+        log.log(in != null ? "Entrada USB escolhida: " + in.getProductName() + " (id " + in.getId() + ")"
+                           : "Nenhuma entrada de áudio USB apareceu para o Android.");
+        main.post(() -> { if (tunerWanted && "usb".equals(tunerSource)) startTunerNow("usb"); });
+    }
+
+    /** Sai do modo afinador USB (se não estiver mais em uso) e reconecta o controle. Roda na fila "worker". */
+    private void endUsbTunerMode() {
+        if (!usbTunerMode || (tunerWanted && "usb".equals(tunerSource))) return;
+        usbTunerMode = false;
+        if (reconnectAfterTuner) {
+            reconnectAfterTuner = false;
+            log.log("Afinador USB fechado: reconectando o controle da pedaleira.");
+            connectAsync();
+        }
+    }
+
+    /** A pedaleira na lista USB: a da última conexão ou, se não houver, a que tem interface MIDI. */
+    private UsbDevice findCubeUsb() {
+        if (usb == null) return null;
+        UsbDevice any = null;
+        for (UsbDevice d : usb.getDeviceList().values()) {
+            if (d.getDeviceName().equals(lastCubeUsbName)) return d;
+            if (any == null && UsbRawLink.candidateInterfaces(d).length > 0) any = d;
+        }
+        return any;
+    }
+
+    /**
+     * Toma e solta todas as interfaces de áudio da pedaleira. Ao soltar, o Android religa o driver do
+     * kernel em cada uma; soltamos primeiro as de stream/MIDI e por último as de controle, porque é pela
+     * interface de controle que o driver cria a placa de som e ele precisa encontrar as outras livres.
+     */
+    private void rebindUsbAudio(UsbDevice d) {
+        UsbDeviceConnection c = usb.openDevice(d);
+        if (c == null) { log.log("Religar áudio USB: openDevice falhou"); return; }
+        java.util.LinkedHashMap<Integer, UsbInterface> byId = new java.util.LinkedHashMap<>();
+        for (int i = 0; i < d.getInterfaceCount(); i++) {
+            UsbInterface it = d.getInterface(i);
+            if (it.getInterfaceClass() == UsbConstants.USB_CLASS_AUDIO && !byId.containsKey(it.getId())) byId.put(it.getId(), it);
+        }
+        List<UsbInterface> claimed = new ArrayList<>();
+        StringBuilder sb = new StringBuilder("Religar áudio USB: tomando interfaces");
+        for (UsbInterface it : byId.values()) {
+            boolean ok = c.claimInterface(it, true);
+            sb.append(' ').append(it.getId()).append(ok ? "" : "(falhou)");
+            if (ok) claimed.add(it);
+        }
+        log.log(sb.toString());
+        sleep(300);
+        java.util.Collections.sort(claimed, (a, b) -> {
+            int ca = a.getInterfaceSubclass() == 1 ? 1 : 0, cb = b.getInterfaceSubclass() == 1 ? 1 : 0;
+            return ca != cb ? ca - cb : a.getId() - b.getId();
+        });
+        sb = new StringBuilder("Religar áudio USB: devolvendo ao Android");
+        for (UsbInterface it : claimed) {
+            boolean ok = c.releaseInterface(it);
+            sb.append(' ').append(it.getId()).append(ok ? "" : "(falhou)");
+            sleep(60);
+        }
+        log.log(sb.toString());
+        c.close();
+        sleep(1500);   // tempo para o driver criar a placa de som de novo
+    }
+
+    private void logAudioInputs() {
+        try {
+            android.media.AudioManager am = (android.media.AudioManager) getSystemService(Context.AUDIO_SERVICE);
+            StringBuilder sb = new StringBuilder("Entradas de áudio no Android:");
+            for (AudioDeviceInfo a : am.getDevices(android.media.AudioManager.GET_DEVICES_INPUTS))
+                sb.append("\n    tipo ").append(a.getType()).append(" \"").append(a.getProductName()).append("\" id ").append(a.getId());
+            log.log(sb.toString());
+        } catch (Exception e) { log.log("Entradas de áudio: " + e.getMessage()); }
     }
 
     @Override
@@ -234,6 +357,14 @@ public class MainActivity extends Activity {
         if (intent != null && UsbManager.ACTION_USB_DEVICE_ATTACHED.equals(intent.getAction())) {
             UsbDevice d = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
             log.log("Aberto ao plugar USB: " + (d != null ? usbSummary(d) : "?"));
+            if (usbTunerMode) {
+                // replugou com o afinador USB aberto: o Android recria o áudio; o controle volta ao sair do afinador
+                if (d != null) lastCubeUsbName = d.getDeviceName();
+                reconnectAfterTuner = true;
+                log.log("Pedaleira plugada com o afinador USB aberto: reabrindo a entrada USB.");
+                main.postDelayed(() -> { if (tunerWanted && "usb".equals(tunerSource)) startTunerNow("usb"); }, 2500);
+                return;
+            }
             if (cube == null) main.postDelayed(this::connectAsync, 1200);
         }
     }
@@ -276,6 +407,13 @@ public class MainActivity extends Activity {
     }
 
     private void connectNow() {
+        if (tunerWanted && "usb".equals(tunerSource)) {
+            // controlar agora derrubaria a entrada USB do afinador; reconecta quando ele fechar
+            reconnectAfterTuner = true;
+            log.log("Conexão adiada: o afinador USB está aberto. O controle volta ao sair do afinador.");
+            event("status", status("tuner", "Afinador USB em uso. Os controles voltam ao sair do afinador."));
+            return;
+        }
         disconnect();
         event("status", status("search", "Procurando a pedaleira…"));
         log.log("---------- Nova tentativa de conexão ----------");
@@ -342,7 +480,7 @@ public class MainActivity extends Activity {
                     sleep(250);
                     CubeDevice c = new CubeDevice(l);
                     c.connect();
-                    link = l; cube = c; cubeUsbName = d.getDeviceName();
+                    link = l; cube = c; cubeUsbName = d.getDeviceName(); lastCubeUsbName = cubeUsbName;
                     cubeSource = "USB direto · " + productName(d) + " · interface " + it.getId();
                     connected();
                     return true;

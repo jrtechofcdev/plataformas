@@ -21,6 +21,10 @@ Feito para mexer rápido e com precisão durante o culto, com botões grandes.
   - O botão Voltar do Android fecha a tela de ajuste.
 - **Afinador** em aba própria: nota gigante, ponteiro largo, cents, Hz, cordas E A D G B E,
   microfone ou entrada USB, A4 de 430 a 450 Hz.
+  - Pela **entrada USB**, o app pausa os controles enquanto o afinador está aberto e reconecta
+    sozinho ao sair. Motivo: a pedaleira é um único aparelho USB (áudio + MIDI). Para mandar os
+    ajustes o app toma a interface MIDI, e o Android (driver snd-usb-audio do Linux) desliga junto
+    a placa de áudio dela. O afinador USB devolve as interfaces ao Android para a placa voltar.
 - **Ferramentas**: metrônomo com tap tempo, importação de IR (.wav), reenviar preset,
   ler presets, presets de fábrica e USB Loopback.
 - **Aprender**: controles, módulos, combinações, os 9 TYPE e os 9 IR CAB, modos e receitas.
@@ -28,7 +32,7 @@ Feito para mexer rápido e com precisão durante o culto, com botões grandes.
 - Desfazer e **trava de palco** (segurar o cadeado 1 s para destravar) no topo.
 
 ## Instalar
-1. Copie `CubeRemote-2.1.0.apk` para o celular e abra (permita "fontes desconhecidas").
+1. Copie `CubeRemote-2.1.1.apk` para o celular e abra (permita "fontes desconhecidas").
    Instala por cima das versões anteriores (mesma chave de assinatura).
 2. Ligue a pedaleira com cabo USB + adaptador OTG. O app conecta sozinho.
 3. Na primeira vez que abrir o afinador, permita o uso do microfone.
@@ -44,7 +48,7 @@ IR CAB e os módulos 1, 2 e 3 nos bytes 10, 11 e 12.
 ## Gerar o APK (sem Android Studio)
 ```bash
 sdkmanager "platforms;android-34" "build-tools;35.0.0"
-ANDROID_HOME=~/android-sdk ./build.sh        # gera dist/CubeRemote-2.1.0.apk
+ANDROID_HOME=~/android-sdk ./build.sh        # gera dist/CubeRemote-2.1.1.apk
 ```
 A assinatura usa `~/.cuberemote.jks`. Guarde esse arquivo: sem ele, uma versão nova não instala por cima.
 
