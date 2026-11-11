@@ -261,7 +261,9 @@ CR.Stage = (function () {
     if (!$("#logPanel").hidden) { $("#logPanel").hidden = true; return true; }
     if (!$("#dialog").hidden) { $("#dialog").hidden = true; return true; }
     if (!$("#adjust").hidden) { closeAdjust(); return true; }
-    if (document.getElementById("app").dataset.view !== "stage") { CR.App.go("stage"); return true; }
+    var view = document.getElementById("app").dataset.view;
+    if (view === "learn") { CR.App.go("settings"); return true; }      // Aprender abre a partir de Ajustes
+    if (view !== "stage") { CR.App.go("stage"); return true; }
     return false;
   };
   document.addEventListener("keydown", function (e) { if (e.key === "Escape") window.cubeBack(); });

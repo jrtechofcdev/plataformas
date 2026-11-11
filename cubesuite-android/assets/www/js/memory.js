@@ -18,6 +18,9 @@ CR.Memory = (function () {
   var data = emptyData(), loaded = false, loadError = "";
   var $ = function (s, r) { return (r || document).querySelector(s); };
 
+  /* Código fixo de cada memória: a setlist aponta para ele, então reordenar não estraga nada. */
+  function newId() { return "m" + Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36); }
+
   function emptyData() {
     var slots = [];
     for (var i = 0; i < N; i++) slots.push(null);
@@ -36,7 +39,7 @@ CR.Memory = (function () {
     }
     CR.CONTROLS.forEach(function (c) { v[c.off] = Math.min(v[c.off], c.max); });
     CR.MODULES.forEach(function (m) { v[m.off] = v[m.off] ? 1 : 0; });
-    return { name: String(s.name || "").trim().slice(0, NAME_MAX) || "Sem nome", values: v,
+    return { id: typeof s.id === "string" && /^[a-z0-9]{4,24}$/.test(s.id) ? s.id : newId(), name: String(s.name || "").trim().slice(0, NAME_MAX) || "Sem nome", values: v,
              from: LETTERS.indexOf(s.from) >= 0 ? s.from : "", saved: String(s.saved || "") };
   }
 
@@ -47,7 +50,11 @@ CR.Memory = (function () {
     var o = JSON.parse(text.slice(a, b + 1));
     if (!o || o.kind !== "memorias" || !Array.isArray(o.slots)) throw new Error("O arquivo não é um backup de memórias do Cube Remote.");
     var d = emptyData();
-    for (var i = 0; i < N; i++) d.slots[i] = cleanSlot(o.slots[i]);
+    for (var i = 0; i < N; i++) {
+      d.slots[i] = cleanSlot(o.slots[i]);
+      if (d.slots[i] && (!o.slots[i].id || o.slots[i].id !== d.slots[i].id)) d._newIds = true;
+    }
+    if (o.setlist) d._setlist = o.setlist;     // backup completo também traz a setlist
     return d;
   }
 
@@ -55,7 +62,11 @@ CR.Memory = (function () {
     return CR.native("memLoad").then(function (txt) {
       loaded = true;
       if (!txt) return;
-      try { data = parse(txt); loadError = ""; }
+      try {
+        data = parse(txt); loadError = "";
+        // arquivo de uma versão antiga, sem códigos: grava os códigos novos para não mudarem a cada abertura
+        if (data._newIds) { delete data._newIds; persist(); }
+      }
       catch (e) { loadError = "O arquivo de memórias estava com problema e não foi lido: " + e.message; }
     }).catch(function (e) { loaded = true; loadError = e.message; });
   }
@@ -175,6 +186,7 @@ CR.Memory = (function () {
     if (!CR.S.presets) { CR.toast("Conecte a pedaleira primeiro", true); return; }
     CR.busy(true, "Carregando no preset " + LETTERS[p]);
     try {
+      if (CR.Live) CR.Live.release();
       await CR.applyValues(p, values);
       CR.haptic();
       CR.toast(label + " carregada no preset " + LETTERS[p] + ". Para voltar, use Desfazer no topo.");
@@ -191,6 +203,7 @@ CR.Memory = (function () {
   function saveDialog(i, p) {
     if (CR.S.locked) { CR.toast("Controles travados. Segure o cadeado para destravar."); return; }
     if (!CR.S.presets) return;
+    if (CR.Live && CR.Live.active()) { CR.toast("Desligue Boost, Mudo ou Fade na aba Culto antes de guardar, para não salvar o volume alterado.", true); return; }
     var v = CR.S.presets[p], old = data.slots[i];
     CR.dialog(CR.MODULES[p].color, "Guardar na memória " + (i + 1), "Som atual do preset " + LETTERS[p],
       '<p class="mem-preview">' + CR.esc(summary(v)) + "</p>" + mods(v) +
@@ -201,7 +214,7 @@ CR.Memory = (function () {
     var d = document.getElementById("dialog"), input = $("#memName");
     setTimeout(function () { input.focus(); }, 60);
     function done() {
-      data.slots[i] = { name: input.value.trim().slice(0, NAME_MAX) || "Memória " + (i + 1), values: v.slice(), from: LETTERS[p], saved: today() };
+      data.slots[i] = { id: old ? old.id : newId(), name: input.value.trim().slice(0, NAME_MAX) || "Memória " + (i + 1), values: v.slice(), from: LETTERS[p], saved: today() };
       d.hidden = true;
       persist().then(function () { CR.haptic(); CR.toast("Guardado na memória " + (i + 1)); refresh(); });
     }
@@ -270,7 +283,11 @@ CR.Memory = (function () {
   }
 
   /* ================================================================ backup */
-  function backupText() { return JSON.stringify(data, null, 1); }
+  function backupText() {
+    var o = { app: data.app, kind: data.kind, version: data.version, slots: data.slots };
+    if (CR.Culto) o.setlist = CR.Culto.data();
+    return JSON.stringify(o, null, 1);
+  }
 
   function exportFile() {
     CR.native("memExport", { data: backupText() })
@@ -304,10 +321,15 @@ CR.Memory = (function () {
     var d;
     try { d = parse(text || ""); }
     catch (e) { CR.toast(e.message, true); return; }
-    var count = d.slots.filter(Boolean).length;
+    var count = d.slots.filter(Boolean).length, sl = d._setlist;
+    delete d._setlist;
+    var songs = sl && Array.isArray(sl.songs) ? sl.songs.length : 0;
     document.getElementById("dialog").hidden = true;
-    if (!(await CR.confirm("Importar backup", "O backup tem " + count + " memória(s). As memórias atuais serão substituídas.", "Importar"))) return;
+    if (!(await CR.confirm("Importar backup", "O backup tem " + count + " memória(s)" + (songs ? " e uma setlist com " + songs + " música(s)" : "") +
+      ". O que está no app agora será substituído.", "Importar"))) return;
+    delete d._newIds;
     data = d;
+    if (sl && CR.Culto) CR.Culto.importData(sl);
     loadError = "";
     persist().then(function () { CR.toast(count + " memória(s) importada(s)"); refresh(); });
   }
@@ -324,7 +346,22 @@ CR.Memory = (function () {
   }
 
   /* Abre o arquivo de memórias ao iniciar o app, para o Palco já mostrar os nomes. */
-  function init() { load().then(function () { CR.emit("memories"); }); }
+  function init() { return load().then(function () { CR.emit("memories"); }); }
 
-  return { render: render, refresh: refresh, nameFor: nameFor, init: init, _parse: parse };
+  /* Para a setlist: lista de sons que podem ir num footswitch ("f0" a "f2" = fábrica A a C). */
+  function options() {
+    var out = [];
+    data.slots.forEach(function (sl, i) { if (sl) out.push({ ref: sl.id, name: (i + 1) + ". " + sl.name }); });
+    LETTERS.forEach(function (L, p) { out.push({ ref: "f" + p, name: "Fábrica " + L }); });
+    return out;
+  }
+  function byRef(ref) {
+    if (!ref) return null;
+    if (/^f[0-2]$/.test(ref)) { var p = Number(ref[1]); return { name: "Fábrica " + LETTERS[p], values: factory()[p] }; }
+    for (var i = 0; i < N; i++) if (data.slots[i] && data.slots[i].id === ref) return data.slots[i];
+    return null;
+  }
+
+  return { render: render, refresh: refresh, nameFor: nameFor, init: init, options: options, byRef: byRef,
+           ready: function () { return loaded; }, _parse: parse };
 })();

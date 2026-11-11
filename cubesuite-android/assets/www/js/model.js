@@ -127,7 +127,7 @@ CR.set = function (offset, value, opts) {
    O preset anterior vai para o desfazer, então o botão Desfazer do topo volta tudo de uma vez. */
 CR.applyValues = async function (preset, values, opts) {
   if (!CR.S.presets) throw new Error("Pedaleira não conectada");
-  if (CR.S.locked) throw new Error("Controles travados");
+  if (CR.S.locked && !(opts && opts.force)) throw new Error("Controles travados");
   var cur = CR.S.presets[preset].slice(), next = cur.slice();
   for (var i = 0; i <= 12; i++) next[i] = values[i];
   CR.S.presets = await CR.native("sendPreset", { preset: preset, values: next });
@@ -137,6 +137,19 @@ CR.applyValues = async function (preset, values, opts) {
   }
   CR.S.preset = preset;
   CR.emit("preset", preset);
+  return true;
+};
+
+/* Muda um byte de um preset qualquer (A=0, B=1, C=2) sem entrar no desfazer.
+   Usado pelas ações ao vivo (Boost, Mudo, Swell, Fade), que agem nos 3 presets.
+   opts.force: funciona mesmo com a trava ligada (pedal Bluetooth). */
+CR.setAt = function (preset, offset, value, opts) {
+  if (!CR.S.presets || (CR.S.locked && !(opts && opts.force))) return false;
+  var p = CR.S.presets[preset];
+  if (p[offset] === value) return false;
+  p[offset] = value;
+  CR.sendByte(preset, offset, value);
+  CR.emit("changed", { offset: offset, value: value, preset: preset, live: true });
   return true;
 };
 

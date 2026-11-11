@@ -59,7 +59,7 @@ import java.util.concurrent.TimeUnit;
  * Tudo é registrado no log (AppLog), visível em Ajustes > Log.
  */
 public class MainActivity extends Activity {
-    static final String VERSION = "2.2.0";
+    static final String VERSION = "2.3.0";
     private static final int PICK_FILE = 41;
     private static final String ACTION_USB_PERMISSION = "com.jrtechofc.cuberemote.USB_PERMISSION";
 
@@ -88,6 +88,8 @@ public class MainActivity extends Activity {
     private volatile boolean usbTunerMode = false;
     private volatile boolean reconnectAfterTuner = false;
     private String lastCubeUsbName = null;
+    // botões de volume do celular (ou controle de selfie Bluetooth) funcionando como pedal (aba Culto)
+    private volatile boolean volumeKeys = false;
 
     // linhas de log que ainda vão para a tela (mandadas em lote, a cada 250 ms)
     private final StringBuilder pendingLog = new StringBuilder();
@@ -131,6 +133,9 @@ public class MainActivity extends Activity {
             }
         });
         setContentView(web);
+        web.setFocusable(true);
+        web.setFocusableInTouchMode(true);
+        web.requestFocus();      // teclas do pedal Bluetooth chegam na página sem precisar tocar na tela
         web.loadUrl("file:///android_asset/www/index.html");
 
         usb = (UsbManager) getSystemService(Context.USB_SERVICE);
@@ -315,6 +320,18 @@ public class MainActivity extends Activity {
         if (res.length > 0 && res[0] == PackageManager.PERMISSION_GRANTED && src != null) startTuner(src);
         else js("window.cubeTunerError&&window.cubeTunerError(" + JSONObject.quote(
                 "O afinador precisa da permissão de microfone. Toque em Ligar afinador e permita.") + ")");
+    }
+
+    /** Com a opção ligada, Volume + e Volume - vão para a aba Culto (próxima / anterior) em vez de mudar o volume. */
+    @Override
+    public boolean dispatchKeyEvent(android.view.KeyEvent e) {
+        int k = e.getKeyCode();
+        if (volumeKeys && (k == android.view.KeyEvent.KEYCODE_VOLUME_UP || k == android.view.KeyEvent.KEYCODE_VOLUME_DOWN)) {
+            if (e.getAction() == android.view.KeyEvent.ACTION_DOWN && e.getRepeatCount() == 0)
+                js("window.cubeKey&&window.cubeKey(" + (k == android.view.KeyEvent.KEYCODE_VOLUME_UP ? "'VolumeUp'" : "'VolumeDown'") + ")");
+            return true;
+        }
+        return super.dispatchKeyEvent(e);
     }
 
     /** Voltar do Android: primeiro fecha a camada aberta no app (ajuste, diálogo, log); depois sai. */
@@ -826,9 +843,13 @@ public class MainActivity extends Activity {
                     resolve(id, true, "null"); return;
                 }
                 case "tunerStop": stopTuner(); resolve(id, true, "null"); return;
-                case "memLoad": resolve(id, true, JSONObject.quote(memLoad())); return;
+                case "setVolumeKeys":
+                    try { volumeKeys = new JSONObject(argsJson).optBoolean("on", false); } catch (Exception ignored) {}
+                    log.log("Botões de volume como pedal: " + (volumeKeys ? "ligado" : "desligado"));
+                    resolve(id, true, "null"); return;
+                case "memLoad": resolve(id, true, JSONObject.quote(memLoad(storeName(argsJson)))); return;
                 case "memSave":
-                    try { memSave(new JSONObject(argsJson).getString("data")); resolve(id, true, "true"); }
+                    try { memSave(storeName(argsJson), new JSONObject(argsJson).getString("data")); resolve(id, true, "true"); }
                     catch (Exception e) { log.log("Erro ao salvar memórias: " + e); resolve(id, false, JSONObject.quote("Não consegui salvar as memórias: " + e.getMessage())); }
                     return;
                 case "memExport":
@@ -943,11 +964,15 @@ public class MainActivity extends Activity {
 
     // ================================================================ memórias de presets
     // Ficam num arquivo do app (memorias.json). A cada gravação o arquivo anterior vira memorias.bak.json.
-    private java.io.File memFile() { return new java.io.File(getFilesDir(), "memorias.json"); }
+    // Arquivos permitidos: memorias.json (aba Memórias) e setlist.json (aba Culto).
+    private static String storeName(String argsJson) {
+        try { return "setlist".equals(new JSONObject(argsJson).optString("name")) ? "setlist" : "memorias"; }
+        catch (Exception e) { return "memorias"; }
+    }
 
-    private synchronized String memLoad() {
-        java.io.File f = memFile();
-        if (!f.exists()) f = new java.io.File(getFilesDir(), "memorias.bak.json");
+    private synchronized String memLoad(String name) {
+        java.io.File f = new java.io.File(getFilesDir(), name + ".json");
+        if (!f.exists()) f = new java.io.File(getFilesDir(), name + ".bak.json");
         if (!f.exists()) return "";
         try {
             byte[] b = new byte[(int) f.length()];
@@ -962,15 +987,15 @@ public class MainActivity extends Activity {
         }
     }
 
-    private synchronized void memSave(String json) throws Exception {
+    private synchronized void memSave(String name, String json) throws Exception {
         new JSONObject(json);                                   // só grava JSON válido
-        java.io.File f = memFile(), tmp = new java.io.File(getFilesDir(), "memorias.tmp");
+        java.io.File f = new java.io.File(getFilesDir(), name + ".json"), tmp = new java.io.File(getFilesDir(), name + ".tmp");
         try (java.io.FileOutputStream out = new java.io.FileOutputStream(tmp)) {
             out.write(json.getBytes(java.nio.charset.StandardCharsets.UTF_8));
             out.getFD().sync();
         }
         if (f.exists()) {
-            java.io.File bak = new java.io.File(getFilesDir(), "memorias.bak.json");
+            java.io.File bak = new java.io.File(getFilesDir(), name + ".bak.json");
             bak.delete();
             f.renameTo(bak);
         }

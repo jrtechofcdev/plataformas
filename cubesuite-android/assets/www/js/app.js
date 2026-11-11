@@ -13,7 +13,7 @@ CR.App = (function () {
     document.getElementById("app").dataset.view = view;
     document.querySelectorAll(".view").forEach(function (v) { v.classList.toggle("active", v.id === "view-" + view); });
     document.querySelectorAll(".nav button").forEach(function (b) {
-      var on = b.dataset.go === view;
+      var on = b.dataset.go === (view === "learn" ? "settings" : view);
       b.classList.toggle("active", on);
       if (on) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
     });
@@ -22,6 +22,7 @@ CR.App = (function () {
     if (view === "settings") CR.Settings.render();
     if (view === "tuner") CR.Tuner.start();
     if (view === "memory") CR.Memory.render();
+    if (view === "culto") CR.Culto.render();
     if (anchor && view === "learn") setTimeout(function () { CR.Learn.scrollTo(anchor); }, 30);
   }
 
@@ -84,6 +85,7 @@ CR.App = (function () {
     initLock();
     CR.Stage.render();
     CR.Memory.init();
+    CR.Culto.init();
     CR.Stage.showState(CR.S.status);
     CR.on("status", applyStatus);
     CR.native("setOrientation", { mode: CR.prefs.orientation }).catch(function () {});

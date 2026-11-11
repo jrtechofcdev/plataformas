@@ -46,6 +46,16 @@ CR.ICONS = {
   save: '<path d="M12 3.5V15"/><path d="m7 10 5 5 5-5"/><path d="M4 14v6.5h16V14"/>',
   edit: '<path d="M4 20h4L19.5 8.5l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>',
   up: '<path d="m5.5 15 6.5-6.5 6.5 6.5"/>',
+  // setlist: linhas de música com uma nota
+  culto: '<path d="M3.5 6h11M3.5 11h11M3.5 16h6"/><path d="M19.5 4v12"/><circle cx="17" cy="17" r="2.5"/>',
+  boost: '<path d="M13 2.5 5 13.5h6l-1 8 8-11h-6z"/>',
+  mute: '<path d="M3.5 9h4l5-4v14l-5-4h-4z"/><path d="m16 9.5 5 5M21 9.5l-5 5"/>',
+  swell: '<path d="M3 19.5h18V5z"/>',
+  fade: '<path d="M3 5v14.5h18z"/>',
+  next: '<path d="M5 5v14l10-7z"/><path d="M19 5v14"/>',
+  prev: '<path d="M19 5v14L9 12z"/><path d="M5 5v14"/>',
+  // pedal visto de lado com ondas de Bluetooth
+  pedalbt: '<path d="M2.5 20h19l-2-5h-15z"/><path d="M7 15l1.5-3.5h7L17 15"/><path d="M15 3.5a5 5 0 0 1 0 5M17.5 2a8 8 0 0 1 0 8"/>',
   down: '<path d="m5.5 9 6.5 6.5L18.5 9"/>',
 };
 

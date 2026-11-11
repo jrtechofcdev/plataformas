@@ -4,7 +4,7 @@ App Android para controlar a pedaleira **Cube Baby** pelo cabo USB (OTG), em tem
 em pé ou deitado. Criado do zero por José Renato (Jr_Tech_OFC).
 © 2026 José Renato · Jr_Tech_OFC. Todos os direitos reservados (veja `LICENSE`).
 
-## Funções (versão 2.2 · modo culto + memórias)
+## Funções (versão 2.3 · modo culto, memórias e setlist)
 Feito para mexer rápido e com precisão durante o culto, com botões grandes.
 - **Palco** (tela principal, nunca rola):
   - **Presets A, B, C** em botões grandes (LED verde, azul, vermelho, como na pedaleira).
@@ -19,6 +19,18 @@ Feito para mexer rápido e com precisão durante o culto, com botões grandes.
   - TYPE e IR CAB: os 9 modelos com número e nome do manual, escolha com um toque.
   - "O que é": explicação rápida e atalho para a aba Aprender.
   - O botão Voltar do Android fecha a tela de ajuste.
+- **Culto** (a tela para usar durante o culto):
+  - **Setlist**: até 40 músicas na ordem, com tom, BPM, anotações e o som de A, B e C de cada
+    uma (memórias ou fábrica, ou "manter como está"). **Próxima** e **Anterior** carregam os
+    três footswitches de uma vez. Mostra a música atual, a seguinte e um pulso visual no BPM.
+  - **Ao vivo**: **Boost de solo** (+5 a +60% de volume, opcionalmente liga o delay), **Mudo**,
+    **Swell** (entrada suave) e **Fade out** (saída suave), de 1 a 12 segundos. Agem nos 3
+    presets ao mesmo tempo porque o app não tem como saber qual footswitch está tocando;
+    ao desligar, os volumes originais voltam.
+  - **Pedal Bluetooth** (virador de páginas): direita e esquerda passam música, ou acionam
+    Boost/Mudo, ou Swell/Fade. Opcional: os botões de volume do celular (e controles de selfie
+    Bluetooth) funcionam como pedal. Funciona com a trava de palco ligada.
+  - A setlist vai junto no backup das memórias. Arquivo do app: `setlist.json`.
 - **Memórias** (10 sons guardados no celular):
   - Cada memória tem botões grandes **A, B, C**: um toque carrega o som naquele footswitch
     (grava na pedaleira e confere). O botão fica marcado "atual" quando o preset já tem esse som.
@@ -37,12 +49,12 @@ Feito para mexer rápido e com precisão durante o culto, com botões grandes.
     a placa de áudio dela. O afinador USB devolve as interfaces ao Android para a placa voltar.
 - **Ferramentas**: metrônomo com tap tempo, importação de IR (.wav), reenviar preset,
   ler presets, presets de fábrica e USB Loopback.
-- **Aprender**: controles, módulos, combinações, os 9 TYPE e os 9 IR CAB, modos e receitas.
+- **Aprender** (em Ajustes): controles, módulos, combinações, os 9 TYPE e os 9 IR CAB, modos e receitas.
 - **Ajustes**: orientação, vibração, afinador, conexão, log e Sobre.
 - Desfazer e **trava de palco** (segurar o cadeado 1 s para destravar) no topo.
 
 ## Instalar
-1. Copie `CubeRemote-2.2.0.apk` para o celular e abra (permita "fontes desconhecidas").
+1. Copie `CubeRemote-2.3.0.apk` para o celular e abra (permita "fontes desconhecidas").
    Instala por cima das versões anteriores (mesma chave de assinatura).
 2. Ligue a pedaleira com cabo USB + adaptador OTG. O app conecta sozinho.
 3. Na primeira vez que abrir o afinador, permita o uso do microfone.
@@ -58,7 +70,7 @@ IR CAB e os módulos 1, 2 e 3 nos bytes 10, 11 e 12.
 ## Gerar o APK (sem Android Studio)
 ```bash
 sdkmanager "platforms;android-34" "build-tools;35.0.0"
-ANDROID_HOME=~/android-sdk ./build.sh        # gera dist/CubeRemote-2.2.0.apk
+ANDROID_HOME=~/android-sdk ./build.sh        # gera dist/CubeRemote-2.3.0.apk
 ```
 A assinatura usa `~/.cuberemote.jks`. Guarde esse arquivo: sem ele, uma versão nova não instala por cima.
 
@@ -75,6 +87,8 @@ cubesuite-android/
 │   ├── js/controls.js        slider e chave liga/desliga
 │   ├── js/stage.js           tela Palco e tela de ajuste
 │   ├── js/memory.js          aba Memórias (10 sons, fábrica e backup)
+│   ├── js/setlist.js         aba Culto (setlist e pedal Bluetooth)
+│   ├── js/live.js            Boost, Mudo, Swell e Fade out
 │   ├── js/tuner.js           aba Afinador
 │   ├── js/learn-data.js      textos da aba Aprender e do "O que é"
 │   ├── js/learn.js, tools.js, settings.js, app.js, icons.js, bridge.js
