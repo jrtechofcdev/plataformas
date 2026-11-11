@@ -30,6 +30,14 @@ public class CubeDevice {
         public DeviceException(String m) { super(m); }
     }
 
+    /** A pedaleira respondeu "comando não existe neste modelo" (ACK com status ≠ 0). */
+    public static class UnsupportedCommandException extends DeviceException {
+        public UnsupportedCommandException(String m) { super(m); }
+    }
+
+    /** A Cube Baby nova não tem o comando 0x24 (soma16): verificamos lendo de volta. */
+    public volatile boolean sum16Supported = true;
+
     /** Destino das mensagens de log (no Android: AppLog; nos testes: console). */
     public interface Logger { void log(String line); }
     public static volatile Logger logger = null;
@@ -97,6 +105,11 @@ public class CubeDevice {
                     if (traceBytes) log("← " + cmdName(expectCmd) + " ok, " + payload.length + " bytes: " + hex(payload, 24));
                     return payload;
                 }
+                // ACK com erro no lugar da resposta esperada = comando não suportado (não espera o timeout)
+                if (CubeProtocol.isHeader(pkt) && pkt.length >= 8 && (pkt[2] & 0xFF) == CMD_ACK_ && expectCmd != CMD_ACK_ && pkt[6] != 0) {
+                    log("← a pedaleira recusou " + cmdName(packet[2] & 0xFF) + " (status " + pkt[6] + "): comando não suportado neste modelo");
+                    throw new UnsupportedCommandException("comando " + cmdName(packet[2] & 0xFF) + " não suportado neste modelo");
+                }
                 log("← pacote ignorado (esperava " + cmdName(expectCmd) + "): " + hex(pkt, 24));
             } catch (CubeProtocol.ProtocolException e) {
                 log("← mensagem não reconhecida (" + e.getMessage() + "): " + hex(msg, 32));
@@ -140,11 +153,37 @@ public class CubeDevice {
         return (p[9] & 0xFF) | ((p[10] & 0xFF) << 8);
     }
 
+    private static final int CMD_ACK_ = 0x00;
+
+    /** Grava na RAM e confere: pela soma16 (modelos antigos) ou lendo de volta (Cube Baby nova). */
     private synchronized void writeRamVerified(long addr, byte[] data) throws Exception {
         write(RAM, addr, data);
-        int s = 0;
-        for (byte b : data) s += b & 0xFF;
-        if (sum16(RAM, addr, data.length) != (s & 0xFFFF)) throw new DeviceException("verificação da RAM falhou");
+        if (sum16Supported) {
+            int s = 0;
+            for (byte b : data) s += b & 0xFF;
+            try {
+                if (sum16(RAM, addr, data.length) != (s & 0xFFFF)) throw new DeviceException("verificação da RAM falhou");
+                return;
+            } catch (UnsupportedCommandException e) {
+                sum16Supported = false;
+                log("Soma16 indisponível: a verificação passa a ser por leitura de volta");
+            }
+        }
+        try {
+            if (!Arrays.equals(read(RAM, addr, data.length), data)) throw new DeviceException("verificação da RAM falhou (leitura diferente)");
+        } catch (UnsupportedCommandException e) {
+            log("Leitura da RAM indisponível: gravação feita sem verificação");
+        }
+    }
+
+    /** Escreve na RAM com a "trava" 0x764 = 0 e SEMPRE devolve 1 no final (mesmo se der erro). */
+    private synchronized void ramWithLock(long addr, byte[] data) throws Exception {
+        write(RAM, 0x764, new byte[]{0});
+        try {
+            writeRamVerified(addr, data);
+        } finally {
+            write(RAM, 0x764, new byte[]{1});
+        }
     }
 
     // ------------------------------------------------------------ conexão
@@ -298,17 +337,27 @@ public class CubeDevice {
 
     public synchronized void irPreview(float[] samples, int distance) throws Exception {
         require(-1);
-        writeRamVerified(0x764, new byte[]{0});
-        writeRamVerified(0x768, irPayload(samples, distance));
-        writeRamVerified(0x764, new byte[]{1});
+        ramWithLock(0x768, irPayload(samples, distance));
     }
 
     public synchronized void irDistance(int distance) throws Exception {
         require(-1);
         byte[] f = ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putFloat(distance / 100f).array();
-        writeRamVerified(0x764, new byte[]{0});
-        writeRamVerified(0x768, f);
-        writeRamVerified(0x764, new byte[]{1});
+        ramWithLock(0x768, f);
+    }
+
+    /**
+     * Envia o preset inteiro (16 bytes): primeiro no endereço "ao vivo" (0x80000000 + …),
+     * depois no endereço normal — botão "Enviar preset" (teste).
+     */
+    public synchronized void sendPreset(int preset, int[] values) throws Exception {
+        require(2);
+        if (preset < 0 || preset > 2 || values.length < 13) throw new DeviceException("preset inválido");
+        byte[] d = new byte[PRESET_SIZE];
+        for (int i = 0; i < Math.min(PRESET_SIZE, values.length); i++) d[i] = (byte) Math.max(0, Math.min(127, values[i]));
+        log("Enviando preset " + "ABC".charAt(preset) + " completo: " + hex(d, 16));
+        write(PRESETS, LIVE | (preset * PRESET_SIZE), d);
+        write(PRESETS, preset * PRESET_SIZE, d);
     }
 
     public synchronized void irSave(int slot, float[] samples, int distance) throws Exception {

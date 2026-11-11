@@ -117,6 +117,7 @@ function applyStatus(st) {
   document.querySelectorAll(".gen2only").forEach((e) => e.classList.toggle("hidden", !gen2));
   $("#oldGen").classList.toggle("hidden", gen2);
   $("#presetSeg").classList.toggle("hidden", !gen2);
+  $("#liveHint").classList.toggle("hidden", !gen2);
   $("#blocks").classList.toggle("hidden", !gen2);
   $("#params").classList.toggle("hidden", !gen2);
   if (gen2) { S.presets = st.presets; render(); $("#loopback").checked = !!st.loopback; }
@@ -308,6 +309,28 @@ function init() {
     finally { busy(false); }
   };
 
+  // Testes de som
+  $("#btnSendPreset").onclick = async () => {
+    const name = "ABC"[S.preset];
+    busy(true, `Enviando preset ${name}…`);
+    try {
+      S.presets = await native("sendPreset", { preset: S.preset, values: S.presets[S.preset] });
+      render();
+      toast(`⬆️ Preset ${name} enviado e conferido. Está no modo PRESET ${name} na pedaleira?`);
+    } catch (e) { toast(e.message, true); }
+    finally { busy(false); }
+  };
+  $("#btnVolTest").onclick = async () => {
+    const p = S.presets[S.preset], vol = p[5];
+    toast("🔊 Volume vai a ZERO por 2 segundos e depois volta. Escute!");
+    try {
+      await native("param", { preset: S.preset, offset: 5, value: 0 });
+      await new Promise((r) => setTimeout(r, 2000));
+      await native("param", { preset: S.preset, offset: 5, value: vol });
+      toast("Volume de volta a " + vol + ". O som sumiu por 2 s? Se não, troque LIVE/PRESET e tente de novo.");
+    } catch (e) { toast(e.message, true); }
+  };
+
   // Mais
   $("#loopback").onchange = async (e) => {
     try { e.target.checked = await native("loopback", { on: e.target.checked }); }
@@ -346,6 +369,7 @@ const Mock = {
       } else if (m === "state") r = this.state();
       else if (m === "param") { this.presets[a.preset][a.offset] = a.value; this.log.push(a); }
       else if (m === "presets") r = this.presets;
+      else if (m === "sendPreset") { this.presets[a.preset] = a.values.slice(); r = JSON.parse(JSON.stringify(this.presets)); }
       else if (m === "loopback") r = this.loop = a.on;
       else if (m === "getLog") r = this.log.map((x) => "param " + JSON.stringify(x)).join("\n") + "\n";
       if (m !== "getLog" && window.cubeLog) window.cubeLog("[simulador] " + m + " " + json + "\n");

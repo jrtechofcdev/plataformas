@@ -17,8 +17,9 @@ from .device import FACTORY_PRESETS, FLASH_BLOCK, FLASH_SIZE
 
 class SimulatedCube:
     def __init__(self, product_id: int = 0x4F06, name: str = "SINCO-CubeBaby",
-                 ir_base: int = 0x60000, magic: bytes = b"\x00\x59"):
+                 ir_base: int = 0x60000, magic: bytes = b"\x00\x59", has_sum16: bool = False):
         self.name = name
+        self.has_sum16 = has_sum16  # a Cube Baby nova responde ACK status 1 ao comando 0x24
         self.magic = magic          # a Cube Baby nova só responde a 00 59
         self.flash = bytearray(b"\xFF" * FLASH_SIZE)
         self.ram = bytearray(0x1000)
@@ -66,6 +67,8 @@ class SimulatedCube:
             mem[a:a + FLASH_BLOCK] = b"\xFF" * FLASH_BLOCK
             self.log.append(("erase", region, addr))
             return P.build_packet(P.CMD_ACK, b"\x00")
+        if cmd == P.CMD_CHECKSUM and not self.has_sum16:
+            return P.build_packet(P.CMD_ACK, b"\x01")
         if cmd == P.CMD_CHECKSUM:
             n = struct.unpack("<I", p[5:9])[0]
             s = P.sum16(bytes(mem[a:a + n]))

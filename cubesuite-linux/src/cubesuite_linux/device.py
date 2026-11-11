@@ -120,6 +120,10 @@ class DeviceError(Exception):
     pass
 
 
+class UnsupportedCommand(DeviceError):
+    """A pedaleira respondeu ACK com erro: o comando não existe neste modelo."""
+
+
 def ir_base_ok(base: int) -> bool:
     """Endereço dos IRs plausível: alinhado ao bloco e cabe na flash."""
     return 0 < base and base % FLASH_BLOCK == 0 and base + FACTORY_IR_LEN <= FLASH_SIZE
@@ -173,6 +177,10 @@ class CubeDevice:
                 pkt = P.from_sysex(msg)
                 if pkt[:2] in P.VALID_MAGICS and pkt[2] == expect_cmd:
                     return pkt
+                # ACK com erro no lugar da resposta = comando não suportado (sem esperar o timeout)
+                if (pkt[:2] in P.VALID_MAGICS and pkt[2] == P.CMD_ACK and expect_cmd != P.CMD_ACK
+                        and len(pkt) > 6 and pkt[6] != 0):
+                    raise UnsupportedCommand("comando 0x%02X não suportado neste modelo" % packet[2])
             except P.ProtocolError:
                 pass  # mensagem de outro tipo: ignora e continua esperando
 
@@ -236,12 +244,32 @@ class CubeDevice:
                                  P.CMD_CHECKSUM, 30.0)
             return P.parse_checksum(pkt)
 
+    sum16_supported = True   # a Cube Baby nova não tem o comando 0x24
+
     def write_ram_verified(self, addr: int, data: bytes) -> None:
-        """Igual à função 0x507EA0: grava na RAM (região 4) e confere a soma."""
+        """Grava na RAM (região 4) e confere: soma16 (antigas) ou leitura de volta (nova)."""
         with self.lock:
             self.write(RAM_REGION, addr, data)
-            if self.device_sum16(RAM_REGION, addr, len(data)) != P.sum16(data):
-                raise DeviceError("verificação da RAM falhou em 0x%X" % addr)
+            if self.sum16_supported:
+                try:
+                    if self.device_sum16(RAM_REGION, addr, len(data)) != P.sum16(data):
+                        raise DeviceError("verificação da RAM falhou em 0x%X" % addr)
+                    return
+                except UnsupportedCommand:
+                    self.sum16_supported = False
+            try:
+                if self.read(RAM_REGION, addr, len(data)) != bytes(data):
+                    raise DeviceError("verificação da RAM falhou em 0x%X (leitura diferente)" % addr)
+            except UnsupportedCommand:
+                pass  # sem como conferir: segue sem verificação
+
+    def _ram_with_lock(self, addr: int, data: bytes) -> None:
+        """Trava 0x764 = 0, grava, e SEMPRE devolve 0x764 = 1 (mesmo com erro)."""
+        self.write(RAM_REGION, 0x764, b"\x00")
+        try:
+            self.write_ram_verified(addr, data)
+        finally:
+            self.write(RAM_REGION, 0x764, b"\x01")
 
     # ------------------------------------------------------------------
     # Conexão / identificação
@@ -352,17 +380,24 @@ class CubeDevice:
         """Toca o IR na hora (RAM), sem salvar — igual a 0x4A0120."""
         self._require()
         with self.lock:
-            self.write_ram_verified(0x764, b"\x00")
-            self.write_ram_verified(0x768, self._ir_payload(samples, distance))
-            self.write_ram_verified(0x764, b"\x01")
+            self._ram_with_lock(0x768, self._ir_payload(samples, distance))
 
     def ir_set_distance(self, distance: int) -> None:
         """Slider 'Distance' — igual a 0x49E220."""
         self._require()
         with self.lock:
-            self.write_ram_verified(0x764, b"\x00")
-            self.write_ram_verified(0x768, struct.pack("<f", distance / 100.0))
-            self.write_ram_verified(0x764, b"\x01")
+            self._ram_with_lock(0x768, struct.pack("<f", distance / 100.0))
+
+    def send_preset(self, preset: int, values: list[int]) -> list[dict]:
+        """Envia o preset inteiro: endereço "ao vivo" e depois o normal (botão de teste)."""
+        self._require(2)
+        if not 0 <= preset < 3 or len(values) < 13:
+            raise DeviceError("preset inválido")
+        d = bytes(max(0, min(127, int(v))) for v in (list(values) + [0] * 16)[:PRESET_SIZE])
+        with self.lock:
+            self.write(PRESET_REGION, LIVE_FLAG | (preset * PRESET_SIZE), d)
+            self.write(PRESET_REGION, preset * PRESET_SIZE, d)
+        return self.read_presets()
 
     def _check_space(self, start: int, length: int) -> None:
         if start + length > FLASH_SIZE:

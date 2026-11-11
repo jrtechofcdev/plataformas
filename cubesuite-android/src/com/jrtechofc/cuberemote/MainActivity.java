@@ -51,7 +51,7 @@ import java.util.concurrent.TimeUnit;
  * Tudo é registrado no log (AppLog), visível no botão 📋 do app.
  */
 public class MainActivity extends Activity {
-    static final String VERSION = "1.3.0";
+    static final String VERSION = "1.4.0";
     private static final int PICK_FILE = 41;
     private static final String ACTION_USB_PERMISSION = "com.jrtechofc.cuberemote.USB_PERMISSION";
 
@@ -632,6 +632,13 @@ public class MainActivity extends Activity {
                     return "true";
                 case "presets":
                     return presetsJson(c.readPresets()).toString();
+                case "sendPreset": {
+                    JSONArray v = a.getJSONArray("values");
+                    int[] vals = new int[v.length()];
+                    for (int i = 0; i < vals.length; i++) vals[i] = v.getInt(i);
+                    c.sendPreset(a.getInt("preset"), vals);
+                    return presetsJson(c.readPresets()).toString();
+                }
                 case "factoryPresets":
                     log.log("Restaurando presets de fábrica");
                     return presetsJson(c.factoryPresets()).toString();

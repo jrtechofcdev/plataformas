@@ -210,6 +210,8 @@ def make_handler(app: AppState, token: str):
             if route == "/api/param":
                 app.need_dev().set_param(int(b["preset"]), str(b["key"]), int(b["value"]))
                 return {"ok": True}
+            if route == "/api/send-preset":
+                return {"presets": app.need_dev().send_preset(int(b["preset"]), list(b["values"]))}
             if route == "/api/factory-presets":
                 return {"presets": app.need_dev().factory_reset_presets()}
             if route == "/api/loopback":
