@@ -15,8 +15,8 @@
 # ============================================================================
 set -euo pipefail
 
-VERSION_NAME="2.3.0"
-VERSION_CODE=10
+VERSION_NAME="2.3.1"
+VERSION_CODE=11
 MIN_SDK=23        # Android 6.0 (primeira versão com MIDI USB)
 TARGET_SDK=34
 

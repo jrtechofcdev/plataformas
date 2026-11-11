@@ -79,8 +79,12 @@ CR.format = function (c, v) {
     return v < c.zero ? { short: "CH " + (c.zero - v), long: "Chorus, intensidade " + (c.zero - v) + " de " + c.zero, unit: "" }
                       : { short: "PH " + (v - c.zero), long: "Phaser, intensidade " + (v - c.zero) + " de " + (c.max - c.zero), unit: "" };
   }
+  /* Cada controle tem um número fixo de posições na pedaleira (GAIN 0 a 7, TONE 0 a 15, VOLUME 0 a 127...).
+     No modo "passos" (padrão) o app mostra a posição real, que anda de 1 em 1 sem pular.
+     No modo "porcentagem" mostra o mesmo valor em %, que pula quando o controle tem poucas posições. */
   var pct = Math.round(v / c.max * 100);
-  return { short: pct + "%", long: "Valor " + v + " de " + c.max, unit: "%" };
+  if (CR.prefs.display === "percent") return { short: pct + "%", long: "Passo " + v + " de " + c.max, unit: "%" };
+  return { short: String(v), long: v + " de " + c.max + " (" + pct + "%)", unit: "" };
 };
 
 /* ---------------------------------------------------------------- envio sem engasgo
@@ -189,7 +193,7 @@ CR.store = {
   get: function (k, d) { try { var v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (_) { return d; } },
   set: function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} },
 };
-CR.prefs = Object.assign({ orientation: "auto", haptics: true, tunerSource: "mic", a4: 440 },
+CR.prefs = Object.assign({ display: "steps", orientation: "auto", haptics: true, tunerSource: "mic", a4: 440 },
                          CR.store.get("cr.prefs", {}));
 CR.savePrefs = function () { CR.store.set("cr.prefs", CR.prefs); };
 

@@ -208,6 +208,8 @@ button { font: inherit; color: inherit; }
 .quick { order: 3; display: grid; grid-template-columns: repeat(auto-fit, minmax(58px, 1fr)); gap: 8px; }
 .quick-btn { min-height: 60px; border-radius: 12px; border: 1px solid var(--line-strong); background: var(--surface); font: 700 18px var(--font-label); letter-spacing: .3px; cursor: pointer; padding: 0 4px; }
 .quick-btn.active { background: var(--led); border-color: var(--led); color: #06080a; }
+.quick.many { grid-template-columns: repeat(auto-fill, minmax(52px, 1fr)); }
+.quick.many .quick-btn { min-height: 52px; font-size: 20px; }
 .slot-grid { order: 2; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .slot-btn { min-height: clamp(72px, 10.5dvh, 120px); display: grid; align-content: start; gap: 2px; padding: 10px; text-align: left; cursor: pointer; min-width: 0;
   border-radius: 14px; border: 1px solid var(--line-strong); background: var(--surface); }

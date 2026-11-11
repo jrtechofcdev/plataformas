@@ -62,7 +62,7 @@ CR.Stage = (function () {
     var v = CR.val(c), f = CR.format(c, v);
     b.querySelector(".t-val").textContent = f.short;
     b.querySelector(".t-sub").textContent = c.list ? CR[c.list][v].name :
-      (c.bipolar ? (v === c.zero ? "Desligado" : v < c.zero ? "Chorus" : "Phaser") : "");
+      (c.bipolar ? (v === c.zero ? "Desligado" : v < c.zero ? "Chorus" : "Phaser") : CR.prefs.display === "percent" ? "" : "de " + c.max);
     b.querySelector(".t-bar i").setAttribute("style", barStyle(c, v));
     b.classList.toggle("on", CR.isActive(c));
     var m = CR.MODULES[c.module - 1];
@@ -126,7 +126,10 @@ CR.Stage = (function () {
 
   function quickValues(c) {
     if (c.bipolar) return [[0, "CH 7"], [3, "CH 4"], [5, "CH 2"], [7, "OFF"], [9, "PH 2"], [11, "PH 4"], [15, "PH 8"]];
-    return [0, 25, 50, 75, 100].map(function (p) { return [Math.round(p / 100 * c.max), p + "%"]; });
+    // poucas posições (GAIN, TONE, REVERB): um botão para cada posição real da pedaleira
+    if (c.max <= 15) { var all = []; for (var i = 0; i <= c.max; i++) all.push([i, String(i)]); return all; }
+    var pctMode = CR.prefs.display === "percent";
+    return [0, 25, 50, 75, 100].map(function (p) { var v = Math.round(p / 100 * c.max); return [v, pctMode ? p + "%" : String(v)]; });
   }
 
   function openAdjust(i) {
@@ -141,7 +144,8 @@ CR.Stage = (function () {
         return '<button type="button" class="slot-btn" data-v="' + v + '"><b>' + s.slot + '</b><span>' + s.name + "</span><small>" + s.kind + "</small></button>";
       }).join("") + "</div>";
     } else {
-      body = '<div class="adj-slider"></div><div class="quick">' + quickValues(c).map(function (q) {
+      var qv = quickValues(c);
+      body = '<div class="adj-slider"></div><div class="quick' + (qv.length > 8 ? " many" : "") + '">' + qv.map(function (q) {
         return '<button type="button" class="quick-btn" data-v="' + q[0] + '">' + q[1] + "</button>";
       }).join("") + "</div>";
     }
@@ -200,21 +204,22 @@ CR.Stage = (function () {
     if (CR.set(c.off, v)) CR.haptic();
   }
 
-  /* −/+ : um passo no toque; segurando, repete e acelera. */
+  /* −/+ : um passo no toque. Segurando, repete SEMPRE de 1 em 1 (nunca pula valores);
+     só a velocidade aumenta: 8 por segundo no começo, depois 12 e 20 por segundo. */
   function holdRepeat(btn, dir) {
-    var t1 = null, t2 = null, count = 0;
-    function step() {
-      var c = adj.c, big = c.max > 40 && count > 12 ? 3 : 1;
-      setV(CR.val(c) + dir * big);
-      count++;
+    var timer = null, count = 0;
+    function step() { setV(CR.val(adj.c) + dir); count++; }
+    function loop() {
+      step();
+      timer = setTimeout(loop, count < 8 ? 125 : count < 20 ? 80 : 50);
     }
-    function stop() { clearTimeout(t1); clearInterval(t2); t1 = t2 = null; }
+    function stop() { clearTimeout(timer); timer = null; }
     btn.addEventListener("pointerdown", function (e) {
       if (CR.S.locked) return;
       e.preventDefault();
       count = 0;
       step();
-      t1 = setTimeout(function () { t2 = setInterval(step, 90); }, 420);
+      timer = setTimeout(loop, 450);
     });
     ["pointerup", "pointerleave", "pointercancel"].forEach(function (ev) { btn.addEventListener(ev, stop); });
     btn.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); step(); } });

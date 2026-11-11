@@ -12,8 +12,11 @@ Feito para mexer rápido e com precisão durante o culto, com botões grandes.
   - **10 controles** em blocos grandes com as cores e nomes do painel, nome completo, valor
     e o modelo do TYPE e do IR CAB. Em pé: 2 colunas x 5 linhas. Deitado: 5 colunas x 2 linhas.
 - **Tela de ajuste** (toque em qualquer controle):
+  - Valores em **passos reais da pedaleira** (GAIN 0 a 7; TONE, REVERB e MOD 0 a 15; TIME 0 a 31;
+    MIX 0 a 118; VOLUME e FB 0 a 127), sempre de 1 em 1. Porcentagem é opcional em Ajustes.
+  - GAIN, TONE e REVERB: um botão para cada posição.
   - Valor gigante, slider largo e atalhos 0, 25, 50, 75, 100% (no MOD: Chorus, OFF, Phaser).
-  - Botões **−** e **+** grandes: um toque = um passo; segurando, repete e acelera.
+  - Botões **−** e **+** grandes: um toque = um passo; segurando, repete mais rápido, sempre de 1 em 1.
   - **Ativo / Zerado** (o MOD zera no centro) e **Valor anterior** (desfaz o ajuste feito ali).
   - Setas **‹ ›** passam para o controle anterior ou seguinte sem fechar a tela.
   - TYPE e IR CAB: os 9 modelos com número e nome do manual, escolha com um toque.
@@ -54,7 +57,7 @@ Feito para mexer rápido e com precisão durante o culto, com botões grandes.
 - Desfazer e **trava de palco** (segurar o cadeado 1 s para destravar) no topo.
 
 ## Instalar
-1. Copie `CubeRemote-2.3.0.apk` para o celular e abra (permita "fontes desconhecidas").
+1. Copie `CubeRemote-2.3.1.apk` para o celular e abra (permita "fontes desconhecidas").
    Instala por cima das versões anteriores (mesma chave de assinatura).
 2. Ligue a pedaleira com cabo USB + adaptador OTG. O app conecta sozinho.
 3. Na primeira vez que abrir o afinador, permita o uso do microfone.
@@ -70,7 +73,7 @@ IR CAB e os módulos 1, 2 e 3 nos bytes 10, 11 e 12.
 ## Gerar o APK (sem Android Studio)
 ```bash
 sdkmanager "platforms;android-34" "build-tools;35.0.0"
-ANDROID_HOME=~/android-sdk ./build.sh        # gera dist/CubeRemote-2.3.0.apk
+ANDROID_HOME=~/android-sdk ./build.sh        # gera dist/CubeRemote-2.3.1.apk
 ```
 A assinatura usa `~/.cuberemote.jks`. Guarde esse arquivo: sem ele, uma versão nova não instala por cima.
 

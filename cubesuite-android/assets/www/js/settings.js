@@ -5,7 +5,7 @@ var CR = window.CR || (window.CR = {});
 
 CR.Settings = (function () {
   var $ = function (s, root) { return (root || document).querySelector(s); };
-  var appInfo = { version: "2.3.0" };
+  var appInfo = { version: "2.3.1" };
 
   function seg(name, options, current) {
     return '<div class="seg" role="group" data-seg="' + name + '">' + options.map(function (o) {
@@ -19,6 +19,8 @@ CR.Settings = (function () {
     v.innerHTML = '<div class="page"><h1 class="page-title">Ajustes</h1>' +
       '<article class="card"><header class="card-head">' + CR.icon("rotate") + "<div><h2>Tela</h2><p>Use em pé ou deitado.</p></div></header>" +
         seg("orientation", [["auto", "Automática"], ["portrait", "Em pé"], ["landscape", "Deitado"]], p.orientation) +
+        '<div class="set-row"><div><b>Como mostrar os valores</b><span>Passos: a posição real da pedaleira (GAIN 0 a 7, TONE 0 a 15, VOLUME 0 a 127), sempre de 1 em 1. Porcentagem: o mesmo valor em %, que pula nos controles com poucas posições.</span></div></div>' +
+        seg("display", [["steps", "Passos"], ["percent", "Porcentagem"]], p.display) +
         '<div class="set-row"><div><b>Vibrar ao tocar</b><span>Retorno tátil a cada toque e a cada passo do ajuste.</span></div><span id="swHaptic"></span></div>' +
         '<div class="set-row"><div><b>Trava de palco</b><span>O cadeado no topo trava todos os controles. Para destravar, segure o cadeado por 1 segundo.</span></div></div></article>' +
 
@@ -52,6 +54,7 @@ CR.Settings = (function () {
           CR.savePrefs();
           g.querySelectorAll("button").forEach(function (x) { x.setAttribute("aria-pressed", String(x === b)); });
           if (key === "orientation") CR.native("setOrientation", { mode: CR.prefs.orientation });
+          if (key === "display") CR.Stage.refresh();
           CR.haptic();
         };
       });
