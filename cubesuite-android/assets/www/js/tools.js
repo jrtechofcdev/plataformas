@@ -210,6 +210,7 @@ CR.Tools = (function () {
   /* ================================================================ PRESETS e LOOPBACK */
   function presetsHtml() {
     return '<article class="card"><header class="card-head">' + CR.icon("pedal") + "<div><h2>Presets da pedaleira</h2><p>Os 3 presets A, B e C.</p></div></header>" +
+      '<button class="btn wide" type="button" id="pSend">' + CR.icon("send") + "<span>Reenviar o preset em edição</span></button>" +
       '<button class="btn wide" type="button" id="pReload">' + CR.icon("list") + "<span>Ler presets da pedaleira</span></button>" +
       '<button class="btn danger wide" type="button" id="pFactory">' + CR.icon("undo") + "<span>Restaurar presets de fábrica</span></button></article>" +
       '<article class="card"><header class="card-head">' + CR.icon("usb") + "<div><h2>USB Loopback</h2><p>Toca na saída da pedaleira o áudio que vem do celular pelo USB.</p></div>" +
@@ -248,6 +249,17 @@ CR.Tools = (function () {
     };
     irUi();
     // presets
+    $("#pSend").onclick = async function () {
+      if (!CR.S.presets || CR.S.locked) return;
+      var name = CR.MODULES[CR.S.preset].fs;
+      CR.busy(true, "Enviando preset " + name);
+      try {
+        CR.S.presets = await CR.native("sendPreset", { preset: CR.S.preset, values: CR.S.presets[CR.S.preset] });
+        CR.emit("preset", CR.S.preset);
+        CR.toast("Preset " + name + " enviado e conferido");
+      } catch (e) { CR.toast(e.message, true); }
+      finally { CR.busy(false); }
+    };
     $("#pReload").onclick = async function () {
       try { CR.S.presets = await CR.native("presets"); CR.emit("preset", CR.S.preset); CR.toast("Presets lidos da pedaleira"); }
       catch (e) { CR.toast(e.message, true); }
@@ -267,7 +279,7 @@ CR.Tools = (function () {
 
   function refresh() {
     var on = CR.S.status.state === "on" && !!CR.S.presets;
-    ["#pReload", "#pFactory"].forEach(function (s) { var b = $(s); if (b) b.disabled = !on; });
+    ["#pSend", "#pReload", "#pFactory"].forEach(function (s) { var b = $(s); if (b) b.disabled = !on; });
     var sw = document.querySelector("#loopSw .switch");
     if (sw) { sw.disabled = !on; sw.set(!!CR.S.status.loopback); }
     irUi();

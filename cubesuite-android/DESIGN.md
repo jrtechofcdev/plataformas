@@ -3,16 +3,25 @@
 Dono da marca: José Renato · Jr_Tech_OFC. Este documento é a referência visual do app;
 qualquer tela nova segue o que está aqui.
 
-## Ideia central
-O app é a pedaleira na mão. A tela principal é uma réplica do painel físico (preto anodizado,
-serigrafia branca condensada, knobs creme com LED no centro) para que a pessoa reconheça cada
-controle sem ler nada. Tudo o que não é painel (navegação, ajustes, textos) fica discreto e escuro,
-para não competir com os LEDs.
+## Ideia central (versão 2.1: modo culto)
+O app é usado de pé, durante o culto, com pouco tempo e pouca luz. Função vem antes de enfeite:
+- **Palco**: tudo o que muda o som em uma tela, sem rolar. Presets A, B, C grandes em cima,
+  módulos 1, 2, 3 logo abaixo e os 10 controles como blocos grandes (2 x 5 em pé, 5 x 2 deitado).
+  Cada bloco mostra o nome do painel, o nome completo, o valor grande e, no TYPE e no IR CAB,
+  o modelo escolhido. Bloco apagado = controle zerado; tracejado = módulo desligado.
+- **Um toque abre a tela de ajuste** em tela cheia: valor gigante, slider largo, atalhos
+  (0, 25, 50, 75, 100% ou CH/OFF/PH no MOD), botões − e + enormes (segurar repete e acelera),
+  chave Ativo/Zerado, "Valor anterior" (volta ao valor de quando abriu) e setas para ir ao
+  controle anterior ou seguinte sem fechar. No TYPE e no IR CAB a tela mostra os 9 modelos
+  com número e nome, para escolher com um toque.
+- Em pé, os botões − e + ficam embaixo, na zona do polegar.
+- O botão Voltar do Android fecha a tela de ajuste; nunca sai do app por engano.
+As cores e os nomes continuam os da pedaleira, para reconhecer cada controle sem ler.
 
 ## Dials (anti-slop)
 - ENERGY 2: presença firme, sem efeitos chamativos.
 - RHYTHM 1: painel de instrumento, alinhamento previsível. Nada de mosaico de cartões.
-- MOTION 1: só movimentos funcionais (LED acende e apaga, agulha do afinador, folha de ajuste sobe).
+- MOTION 1: só movimentos funcionais (LED acende e apaga, agulha do afinador, tela de ajuste sobe).
 
 ## Cores
 | Papel | Valor | Por quê |
@@ -30,7 +39,7 @@ Regra do acento: as cores de LED pertencem aos controles da pedaleira; o teal pe
 Um nunca substitui o outro.
 
 ## Brilho (glow)
-Usado somente em LEDs e no centro dos knobs ativos, porque espelha o hardware: LED aceso quer
+Usado somente em LEDs, porque espelha o hardware: LED aceso quer
 dizer efeito ligado (manual do fabricante, modo LIVE). Nenhum outro elemento brilha.
 
 ## Tipografia
@@ -45,10 +54,10 @@ pedal, diapasão, metrônomo, livro, engrenagem, cadeado, desfazer, enviar, info
 Nenhum emoji em lugar algum, inclusive mensagens do Java.
 
 ## Toque e tamanho
-- Tela Pedal nunca rola, em pé ou deitado; o tamanho dos knobs se adapta à altura disponível.
-- Alvos de toque de no mínimo 44 px.
-- Knob e slider só mudam de valor depois de 6 px de arrasto; toque simples não altera nada
-  (abre o ajuste fino). Isso evita mudanças acidentais com o celular no pedestal.
+- Palco e Afinador nunca rolam, em pé ou deitado; testado de 360 x 640 até tablet.
+- Alvos de toque: mínimo 44 px; na tela Palco e na tela de ajuste, 54 a 112 px.
+- Celulares baixos (até 760 px de altura em pé): blocos compactos com nome e valor na mesma linha.
+- Slider só muda o valor depois de 6 px de arrasto. Botões − e +: um toque = um passo.
 - Trava de palco: bloqueia todos os controles; destrava segurando o cadeado por 1 segundo.
 
 ## Texto

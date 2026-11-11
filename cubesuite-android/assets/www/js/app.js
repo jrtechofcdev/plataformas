@@ -8,7 +8,8 @@ CR.App = (function () {
   var rendered = {};
 
   function go(view, anchor) {
-    if (view !== "pedal" && CR.Tuner.isActive()) CR.Tuner.stop();
+    if (view !== "tuner" && CR.Tuner.isActive()) CR.Tuner.stop();
+    if (view !== "stage") CR.Stage.closeAdjust();
     document.getElementById("app").dataset.view = view;
     document.querySelectorAll(".view").forEach(function (v) { v.classList.toggle("active", v.id === "view-" + view); });
     document.querySelectorAll(".nav button").forEach(function (b) {
@@ -19,6 +20,7 @@ CR.App = (function () {
     if (view === "learn" && !rendered.learn) { CR.Learn.render(); rendered.learn = true; }
     if (view === "tools") { if (!rendered.tools) { CR.Tools.render(); rendered.tools = true; } else CR.Tools.refresh(); }
     if (view === "settings") CR.Settings.render();
+    if (view === "tuner") CR.Tuner.start();
     if (anchor && view === "learn") setTimeout(function () { CR.Learn.scrollTo(anchor); }, 30);
   }
 
@@ -31,8 +33,9 @@ CR.App = (function () {
     chip.className = "chip " + (st.state === "on" ? (st.mock ? "sim" : "on") : st.state === "search" ? "search" : "off");
     chip.querySelector("span").textContent = st.state === "on" ? (st.mock ? "Simulação" : "Conectada") : st.state === "search" ? "Procurando" : "Desconectada";
     if (st.warning) CR.toast(st.warning, true);
-    CR.Pedal.showState(st);
-    if (CR.S.presets) CR.Pedal.refreshAll();
+    CR.Stage.showState(st);
+    if (CR.S.presets) CR.Stage.refresh();
+    else CR.Stage.closeAdjust();
     if (rendered.tools) CR.Tools.refresh();
     if (document.getElementById("app").dataset.view === "settings") CR.Settings.render();
   }
@@ -75,9 +78,8 @@ CR.App = (function () {
     };
     document.querySelectorAll(".nav button").forEach(function (b) { b.onclick = function () { go(b.dataset.go); }; });
     initLock();
-    CR.Pedal.initBar();
-    CR.Pedal.render();
-    CR.Pedal.showState(CR.S.status);
+    CR.Stage.render();
+    CR.Stage.showState(CR.S.status);
     CR.on("status", applyStatus);
     CR.native("setOrientation", { mode: CR.prefs.orientation }).catch(function () {});
     CR.native("state").then(function (st) {

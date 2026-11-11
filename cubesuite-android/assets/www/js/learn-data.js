@@ -125,7 +125,7 @@ CR.LEARN.modes = [
   { name: "PRESET", how: "Modo padrão ao ligar. Os footswitches A, B e C chamam os 3 presets; o LED aceso mostra qual está em uso. Os knobs físicos não mudam o timbre, só o VOLUME final. O Cube Remote edita esses presets." },
   { name: "LIVE", how: "Toque B + C juntos. Os knobs físicos mandam no som do jeito que estão (o que você vê é o que ouve) e os footswitches ligam e desligam os módulos 1, 2 e 3. Segure A, B ou C para salvar no preset." },
   { name: "EDIT", how: "Toque A + B juntos. Serve para ajustar os 3 presets com calma, comparando um com o outro." },
-  { name: "TUNER", how: "Segure B + C por 2 segundos. Os knobs IR CAB, REVERB, MIX, FB, TIME e MOD representam as cordas E A D G B E; TONE, GAIN e TYPE indicam baixo, afinado e alto. O Cube Remote tem um afinador mais preciso na tela Pedal." },
+  { name: "TUNER", how: "Segure B + C por 2 segundos. Os knobs IR CAB, REVERB, MIX, FB, TIME e MOD representam as cordas E A D G B E; TONE, GAIN e TYPE indicam baixo, afinado e alto. O Cube Remote tem um afinador mais preciso na aba Afinador." },
   { name: "BT", how: "Segure A + B por 2 segundos para ligar ou desligar o Bluetooth de áudio: o celular toca música através da pedaleira para você tocar junto." },
 ];
 

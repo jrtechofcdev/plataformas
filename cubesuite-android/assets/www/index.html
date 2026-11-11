@@ -9,16 +9,7 @@
   <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
-  <!-- gradientes compartilhados pelos knobs -->
-  <svg width="0" height="0" class="defs" aria-hidden="true">
-    <defs>
-      <radialGradient id="g-skirt" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="#ecE9e1"/><stop offset=".7" stop-color="#c9c5bb"/><stop offset="1" stop-color="#9d998f"/></radialGradient>
-      <radialGradient id="g-cap" cx="45%" cy="40%" r="65%"><stop offset="0" stop-color="#3a3d43"/><stop offset="1" stop-color="#15171a"/></radialGradient>
-      <linearGradient id="g-metal" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f1f2f4"/><stop offset=".45" stop-color="#a9aeb5"/><stop offset="1" stop-color="#5e646c"/></linearGradient>
-    </defs>
-  </svg>
-
-  <div id="app" class="app" data-view="pedal">
+  <div id="app" class="app" data-view="stage">
     <!-- cabeçalho -->
     <header class="topbar">
       <div class="brand">
@@ -34,27 +25,26 @@
 
     <!-- navegação -->
     <nav class="nav" aria-label="Seções">
-      <button data-go="pedal" class="active" type="button"><span class="nav-ico" data-icon="pedal"></span><span>Pedal</span></button>
-      <button data-go="learn" type="button"><span class="nav-ico" data-icon="learn"></span><span>Aprender</span></button>
+      <button data-go="stage" class="active" type="button"><span class="nav-ico" data-icon="pedal"></span><span>Palco</span></button>
+      <button data-go="tuner" type="button"><span class="nav-ico" data-icon="tuner"></span><span>Afinador</span></button>
       <button data-go="tools" type="button"><span class="nav-ico" data-icon="tools"></span><span>Ferramentas</span></button>
+      <button data-go="learn" type="button"><span class="nav-ico" data-icon="learn"></span><span>Aprender</span></button>
       <button data-go="settings" type="button"><span class="nav-ico" data-icon="settings"></span><span>Ajustes</span></button>
     </nav>
 
     <main class="views">
-      <!-- ============ PEDAL ============ -->
-      <section id="view-pedal" class="view active" aria-label="Pedal">
-        <div class="pedal-bar">
-          <div class="editing"><span class="led-dot" id="editingLed"></span><span id="editingText">Preset A</span></div>
-          <button id="btnTuner" class="bar-btn" type="button"><span data-icon="tuner"></span><span>Afinador</span></button>
-          <button id="btnSend" class="bar-btn" type="button"><span data-icon="send"></span><span>Enviar</span></button>
+      <!-- ============ PALCO ============ -->
+      <section id="view-stage" class="view active" aria-label="Palco">
+        <div class="stage">
+          <div id="presetBar" class="preset-bar" role="group" aria-label="Preset em edição"></div>
+          <div id="moduleBar" class="module-bar" role="group" aria-label="Módulos"></div>
+          <div id="tiles" class="tiles"></div>
         </div>
-        <div id="panel" class="panel" data-style="knobs" data-mode="edit">
-          <div class="fs-col" id="fsCol"></div>
-          <div class="ctl-col" id="ctlCol"></div>
-          <div class="tuner-readout" id="tunerReadout" hidden></div>
-        </div>
-        <div id="pedalState" class="pedal-state" hidden></div>
+        <div id="stageState" class="stage-state" hidden></div>
       </section>
+
+      <!-- ============ AFINADOR ============ -->
+      <section id="view-tuner" class="view" aria-label="Afinador"></section>
 
       <!-- ============ APRENDER ============ -->
       <section id="view-learn" class="view scroll" aria-label="Aprender"></section>
@@ -67,13 +57,10 @@
     </main>
   </div>
 
-  <!-- ajuste fino de um controle (abre ao tocar no knob) -->
-  <div id="sheet" class="sheet" hidden>
-    <div class="sheet-backdrop" data-close></div>
-    <div class="sheet-card" role="dialog" aria-modal="true" aria-labelledby="sheetTitle"></div>
-  </div>
+  <!-- tela de ajuste de um controle (abre ao tocar num botão da tela Palco) -->
+  <section id="adjust" class="adjust" hidden role="dialog" aria-modal="true" aria-labelledby="adjTitle"></section>
 
-  <!-- explicação de um controle (botão !) e diálogos -->
+  <!-- diálogos (confirmações e explicações) -->
   <div id="dialog" class="sheet dialog" hidden>
     <div class="sheet-backdrop" data-close></div>
     <div class="sheet-card" role="dialog" aria-modal="true" aria-labelledby="dialogTitle"></div>
@@ -95,7 +82,7 @@
   <script src="js/model.js"></script>
   <script src="js/controls.js"></script>
   <script src="js/learn-data.js"></script>
-  <script src="js/pedal.js"></script>
+  <script src="js/stage.js"></script>
   <script src="js/tuner.js"></script>
   <script src="js/learn.js"></script>
   <script src="js/tools.js"></script>

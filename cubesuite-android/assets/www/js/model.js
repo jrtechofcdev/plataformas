@@ -111,7 +111,7 @@ CR.set = function (offset, value, opts) {
   if (prev === value) return false;
   if (!(opts && opts.noUndo)) {
     var last = CR.S.undo[CR.S.undo.length - 1];
-    // arrastar um knob gera muitos valores: junta tudo num único "desfazer"
+    // arrastar o slider ou segurar o + gera muitos valores: junta tudo num único "desfazer"
     if (last && last.preset === CR.S.preset && last.offset === offset && Date.now() - last.t < 1200) { last.t = Date.now(); }
     else CR.S.undo.push({ preset: CR.S.preset, offset: offset, prev: prev, t: Date.now() });
     if (CR.S.undo.length > 60) CR.S.undo.shift();
@@ -150,7 +150,7 @@ CR.store = {
   get: function (k, d) { try { var v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (_) { return d; } },
   set: function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} },
 };
-CR.prefs = Object.assign({ style: "knobs", orientation: "auto", haptics: true, tunerSource: "mic", a4: 440 },
+CR.prefs = Object.assign({ orientation: "auto", haptics: true, tunerSource: "mic", a4: 440 },
                          CR.store.get("cr.prefs", {}));
 CR.savePrefs = function () { CR.store.set("cr.prefs", CR.prefs); };
 

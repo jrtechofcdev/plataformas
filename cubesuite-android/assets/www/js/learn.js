@@ -29,7 +29,7 @@ CR.Learn = (function () {
     var sets = L.bestSets.map(function (s) {
       return "<tr><th>" + s.style + "</th><td>" + s.modules + "</td><td>" + s.how + "</td></tr>";
     }).join("");
-    return '<p class="l-lead">O som passa pelos blocos sempre nesta ordem. Cada módulo pode ser ligado ou desligado por preset, na chave abaixo de cada footswitch da tela Pedal.</p>' +
+    return '<p class="l-lead">O som passa pelos blocos sempre nesta ordem. Cada módulo pode ser ligado ou desligado por preset, nos botões Módulo 1, 2 e 3 da tela Palco.</p>' +
       '<div class="chain">' + chain + "</div>" + mods +
       '<h3 class="l-sub">Qual o melhor conjunto?</h3><p class="l-lead">Depende da música. Pontos de partida:</p>' +
       '<div class="table-wrap"><table class="l-table"><thead><tr><th>Estilo</th><th>Módulos</th><th>Como</th></tr></thead><tbody>' + sets + "</tbody></table></div>";

@@ -1,11 +1,11 @@
 /* Cube Remote · Copyright (c) 2026 José Renato · Jr_Tech_OFC. Todos os direitos reservados.
-   Aba Ajustes: estilo dos controles, tela, afinador, conexão, avançado (log) e Sobre. */
+   Aba Ajustes: tela, afinador, conexão, avançado (log) e Sobre. */
 "use strict";
 var CR = window.CR || (window.CR = {});
 
 CR.Settings = (function () {
   var $ = function (s, root) { return (root || document).querySelector(s); };
-  var appInfo = { version: "2.0.0" };
+  var appInfo = { version: "2.1.0" };
 
   function seg(name, options, current) {
     return '<div class="seg" role="group" data-seg="' + name + '">' + options.map(function (o) {
@@ -17,16 +17,12 @@ CR.Settings = (function () {
     var p = CR.prefs, st = CR.S.status;
     var v = document.getElementById("view-settings");
     v.innerHTML = '<div class="page"><h1 class="page-title">Ajustes</h1>' +
-      '<article class="card"><header class="card-head">' + CR.icon("knob") + "<div><h2>Controles</h2><p>Como os 10 controles aparecem na tela Pedal.</p></div></header>" +
-        seg("style", [["knobs", "Knobs", "knob"], ["sliders", "Sliders", "slider"]], p.style) +
-        '<p class="hint">Nos dois estilos o valor só muda depois de um arrasto curto; um toque simples não altera nada. No modo sliders cada controle tem a chave ativo / zerado ao lado.</p></article>' +
-
       '<article class="card"><header class="card-head">' + CR.icon("rotate") + "<div><h2>Tela</h2><p>Use em pé ou deitado.</p></div></header>" +
         seg("orientation", [["auto", "Automática"], ["portrait", "Em pé"], ["landscape", "Deitado"]], p.orientation) +
-        '<div class="set-row"><div><b>Vibrar ao tocar</b><span>Retorno tátil nos knobs com posições, chaves e footswitches.</span></div><span id="swHaptic"></span></div>' +
+        '<div class="set-row"><div><b>Vibrar ao tocar</b><span>Retorno tátil a cada toque e a cada passo do ajuste.</span></div><span id="swHaptic"></span></div>' +
         '<div class="set-row"><div><b>Trava de palco</b><span>O cadeado no topo trava todos os controles. Para destravar, segure o cadeado por 1 segundo.</span></div></div></article>' +
 
-      '<article class="card"><header class="card-head">' + CR.icon("tuner") + "<div><h2>Afinador</h2><p>Abra pelo botão Afinador na tela Pedal.</p></div></header>" +
+      '<article class="card"><header class="card-head">' + CR.icon("tuner") + "<div><h2>Afinador</h2><p>Também dá para trocar na própria aba Afinador.</p></div></header>" +
         seg("tunerSource", [["mic", "Microfone"], ["usb", "Entrada USB"]], p.tunerSource) +
         '<p class="hint" id="inputsHint">O microfone sempre funciona; aproxime o celular da guitarra ou do fone. A entrada USB usa o áudio da própria pedaleira e é experimental: alguns celulares não liberam esse áudio enquanto o app controla a pedaleira pelo mesmo cabo.</p>' +
         '<div class="set-row"><div><b>Referência A4</b><span>Padrão 440 Hz.</span></div><div class="stepper"><button class="step" type="button" data-a4="-1" aria-label="Diminuir A4">' + CR.icon("minus") + '</button><b id="a4Val">' + p.a4 + ' Hz</b><button class="step" type="button" data-a4="1" aria-label="Aumentar A4">' + CR.icon("plus") + "</button></div></div></article>" +
@@ -52,7 +48,6 @@ CR.Settings = (function () {
           CR.prefs[key] = b.dataset.v;
           CR.savePrefs();
           g.querySelectorAll("button").forEach(function (x) { x.setAttribute("aria-pressed", String(x === b)); });
-          if (key === "style") CR.Pedal.render();
           if (key === "orientation") CR.native("setOrientation", { mode: CR.prefs.orientation });
           CR.haptic();
         };

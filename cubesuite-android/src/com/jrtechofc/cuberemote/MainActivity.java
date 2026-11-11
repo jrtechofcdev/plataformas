@@ -57,7 +57,7 @@ import java.util.concurrent.TimeUnit;
  * Tudo é registrado no log (AppLog), visível em Ajustes > Log.
  */
 public class MainActivity extends Activity {
-    static final String VERSION = "2.0.0";
+    static final String VERSION = "2.1.0";
     private static final int PICK_FILE = 41;
     private static final String ACTION_USB_PERMISSION = "com.jrtechofc.cuberemote.USB_PERMISSION";
 
@@ -192,6 +192,15 @@ public class MainActivity extends Activity {
         if (res.length > 0 && res[0] == PackageManager.PERMISSION_GRANTED && src != null) startTuner(src);
         else js("window.cubeTunerError&&window.cubeTunerError(" + JSONObject.quote(
                 "O afinador precisa da permissão de microfone. Toque em Ligar afinador e permita.") + ")");
+    }
+
+    /** Voltar do Android: primeiro fecha a camada aberta no app (ajuste, diálogo, log); depois sai. */
+    @Override
+    public void onBackPressed() {
+        if (web == null) { super.onBackPressed(); return; }
+        web.evaluateJavascript("window.cubeBack ? window.cubeBack() : false", v -> {
+            if (!"true".equals(v)) MainActivity.super.onBackPressed();
+        });
     }
 
     @Override
