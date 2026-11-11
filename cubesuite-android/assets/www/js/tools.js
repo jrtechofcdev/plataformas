@@ -113,99 +113,39 @@ CR.Tools = (function () {
       '<p class="hint">Com a pedaleira conectada, o Android costuma tocar o clique pelo áudio USB, direto no fone da pedaleira.</p></article>';
   }
 
-  /* ================================================================ IR */
-  var IR = { data: null, slot: 0 };
-
-  function readWav(buf) {
-    var d = new DataView(buf);
-    var tag = function (o) { return String.fromCharCode(d.getUint8(o), d.getUint8(o + 1), d.getUint8(o + 2), d.getUint8(o + 3)); };
-    if (buf.byteLength < 12 || tag(0) !== "RIFF" || tag(8) !== "WAVE") throw new Error("Não é um arquivo WAV válido");
-    var pos = 12, fmt = null, data = null;
-    while (pos + 8 <= buf.byteLength) {
-      var id = tag(pos), size = d.getUint32(pos + 4, true);
-      if (id === "fmt ") fmt = pos + 8;
-      if (id === "data") data = { off: pos + 8, len: Math.min(size, buf.byteLength - pos - 8) };
-      pos += 8 + size + (size & 1);
-    }
-    if (fmt === null || !data) throw new Error("WAV incompleto (sem bloco de formato ou de dados)");
-    var fmtTag = d.getUint16(fmt, true), ch = d.getUint16(fmt + 2, true), rate = d.getUint32(fmt + 4, true);
-    var align = d.getUint16(fmt + 12, true), bits = d.getUint16(fmt + 14, true);
-    if (fmtTag === 0xFFFE) fmtTag = d.getUint16(fmt + 24, true);
-    var w = align / ch, frames = Math.floor(data.len / align), out = [];
-    for (var i = 0; i < Math.min(512, frames); i++) {
-      var o = data.off + i * align, v;
-      if (fmtTag === 3 && w === 4) v = d.getFloat32(o, true);
-      else if (fmtTag === 3 && w === 8) v = d.getFloat64(o, true);
-      else if (fmtTag === 1 && w === 1) v = (d.getUint8(o) - 128) / 128;
-      else if (fmtTag === 1 && w === 2) v = d.getInt16(o, true) / 32767;
-      else if (fmtTag === 1 && w === 3) { var x = d.getUint8(o) | (d.getUint8(o + 1) << 8) | (d.getUint8(o + 2) << 16); if (x & 0x800000) x -= 0x1000000; v = x / 8388608; }
-      else if (fmtTag === 1 && w === 4) v = d.getInt32(o, true) / 2147483648;
-      else throw new Error("Formato WAV não suportado (" + bits + " bits)");
-      out.push(Math.round(v * 1e6) / 1e6);
-    }
-    while (out.length < 512) out.push(0);
-    return { samples: out, rate: rate, bits: bits, frames: frames };
+  /* ================================================================ MODO ENSAIO
+     O app solta o cabo para o Android tocar o som do celular (YouTube, Spotify, metrônomo) na pedaleira.
+     Enquanto isso os controles ficam pausados; ao sair, tudo volta (inclusive o USB Loopback). */
+  var ensaio = false;
+  function ensaioHtml() {
+    return '<article class="card" id="ensaioCard"><header class="card-head">' + CR.icon("headphones") + "<div><h2>Modo ensaio</h2>" +
+      "<p>Toque junto com músicas do celular (YouTube, Spotify) ouvindo tudo no fone ou na saída da pedaleira.</p></div></header>" +
+      '<button class="btn wide big" type="button" id="ensaioBtn"></button>' +
+      '<p class="hint">Enquanto o ensaio estiver ligado, os controles do app ficam pausados (o Android não deixa usar o áudio e o controle pelo mesmo cabo ao mesmo tempo). Ao sair, o app reconecta e devolve o USB Loopback como estava, para nenhum som do celular ir para o som da igreja sem querer.</p></article>';
   }
-
-  function drawWave(s) {
-    var c = $("#irWave"), g = c.getContext("2d"), w = c.width, h = c.height, mid = h / 2;
-    g.clearRect(0, 0, w, h);
-    g.strokeStyle = "#2b313b"; g.lineWidth = 1;
-    g.beginPath(); g.moveTo(0, mid); g.lineTo(w, mid); g.stroke();
-    var peak = Math.max.apply(null, s.map(Math.abs).concat([1e-9]));
-    g.strokeStyle = "#38e27c"; g.lineWidth = 2.5; g.beginPath();
-    s.forEach(function (v, i) { var x = i / (s.length - 1) * w, y = mid - v / peak * (mid - 8); if (i) g.lineTo(x, y); else g.moveTo(x, y); });
-    g.stroke();
+  function paintEnsaio() {
+    var b = $("#ensaioBtn");
+    if (!b) return;
+    var can = ensaio || CR.S.status.state === "on";
+    b.disabled = !can;
+    b.classList.toggle("primary", !ensaio);
+    b.classList.toggle("danger", ensaio);
+    b.innerHTML = CR.icon(ensaio ? "stop" : "play") + "<span>" + (ensaio ? "Sair do ensaio e voltar a controlar" : "Começar o ensaio") + "</span>";
   }
-
-  async function loadWav(file) {
-    if (!file) return;
-    try {
-      var ir = readWav(await file.arrayBuffer());
-      ir.name = file.name;
-      IR.data = ir;
-      irUi();
-      drawWave(ir.samples);
-      if (!CR.S.presets && CR.S.status.state !== "on") { CR.toast("IR carregado. Conecte a pedaleira para ouvir."); return; }
-      CR.busy(true, "Enviando prévia do IR");
-      await CR.native("irPreview", { samples: ir.samples, distance: Number($("#irDist").value) });
-      CR.toast("IR tocando na pedaleira (prévia, ainda não salvo)");
-      if ([44100, 48000].indexOf(ir.rate) < 0) CR.toast("O arquivo está em " + ir.rate + " Hz. Prefira IRs em 44,1 ou 48 kHz.", true);
-    } catch (e) { CR.toast(e.message, true); }
-    finally { CR.busy(false); }
+  function bindEnsaio() {
+    $("#ensaioBtn").onclick = function () {
+      if (ensaio) { CR.native("ensaioStop"); return; }
+      CR.busy(true, "Liberando o áudio USB");
+      CR.native("ensaioStart").catch(function (e) { CR.busy(false); CR.toast(e.message, true); });
+    };
+    paintEnsaio();
   }
-
-  function irUi() {
-    var root = $("#irCard");
-    if (!root) return;
-    var has = !!IR.data, on = CR.S.status.state === "on";
-    var blocked = CR.S.status.irWritable === false;
-    $(".ir-empty", root).hidden = has;
-    $(".ir-loaded", root).hidden = !has;
-    if (has) {
-      $(".ir-name", root).textContent = IR.data.name;
-      $(".ir-meta", root).textContent = IR.data.rate + " Hz · " + IR.data.bits + " bits · " + IR.data.frames + " amostras";
-    }
-    root.querySelectorAll("[data-slot]").forEach(function (b) { b.setAttribute("aria-pressed", String(Number(b.dataset.slot) === IR.slot)); });
-    var save = $("#irSave", root);
-    save.disabled = !has || !on || blocked;
-    save.innerHTML = CR.icon(blocked ? "lock" : "send") + "<span>" + (blocked ? "Gravação de IR bloqueada neste modelo" : "Salvar no slot " + (IR.slot + 2) + " do IR CAB") + "</span>";
-    $("#irDistVal").textContent = $("#irDist").value + "%";
-  }
-
-  function irHtml() {
-    var slots = "";
-    for (var i = 0; i < 8; i++) slots += '<button type="button" data-slot="' + i + '">' + (i + 2) + "</button>";
-    return '<article class="card" id="irCard"><header class="card-head">' + CR.icon("wave") + "<div><h2>Importar IR</h2><p>Troque um gabinete do IR CAB por um arquivo .wav seu.</p></div></header>" +
-      '<label class="drop"><input id="wavInput" type="file" accept=".wav,audio/*" hidden>' +
-      '<span class="ir-empty">' + CR.icon("file") + "<b>Escolher arquivo .wav</b><small>São usadas as 512 primeiras amostras (canal esquerdo), como no programa original.</small></span>" +
-      '<span class="ir-loaded" hidden><b class="ir-name"></b><small class="ir-meta"></small><canvas id="irWave" width="800" height="180"></canvas><small>Toque para trocar o arquivo</small></span></label>' +
-      '<div class="field"><div class="field-head"><span>Distância do microfone</span><b id="irDistVal">50%</b></div>' +
-      '<input id="irDist" class="range green" type="range" min="1" max="100" value="50" aria-label="Distância do microfone"></div>' +
-      '<div class="field"><div class="field-head"><span>Slot do IR CAB que será substituído</span></div><div class="slots">' + slots + "</div></div>" +
-      '<button class="btn primary wide" type="button" id="irSave"></button>' +
-      '<p class="hint">A posição 1 do IR CAB é "desligado", por isso os slots graváveis vão de 2 a 9.</p></article>';
-  }
+  CR.on("ensaio", function (d) {
+    ensaio = !!d.on;
+    CR.busy(false);
+    if (d.on) CR.toast(d.output ? "Pronto: o som do celular já sai na pedaleira. Abra o YouTube ou o Spotify." : "O Android não mostrou a saída de áudio da pedaleira. Tente desconectar e conectar o cabo.", !d.output);
+    paintEnsaio();
+  });
 
   /* ================================================================ PRESETS e LOOPBACK */
   function presetsHtml() {
@@ -219,7 +159,7 @@ CR.Tools = (function () {
 
   function render() {
     var v = document.getElementById("view-tools");
-    v.innerHTML = '<div class="page"><h1 class="page-title">Ferramentas</h1>' + metroHtml() + irHtml() + presetsHtml() + "</div>";
+    v.innerHTML = '<div class="page"><h1 class="page-title">Ferramentas</h1>' + metroHtml() + ensaioHtml() + CR.Delay.cardHtml() + CR.IrLab.html() + presetsHtml() + "</div>";
     // metrônomo
     v.querySelectorAll("[data-bpm]").forEach(function (b) { b.onclick = function () { setBpm(M.bpm + Number(b.dataset.bpm)); }; });
     $("#bpmRange").oninput = function (e) { setBpm(Number(e.target.value)); };
@@ -229,25 +169,10 @@ CR.Tools = (function () {
     $("#metroTap").onclick = tap;
     $("#metroPlay").onclick = function () { M.running ? metroStop() : metroStart(); };
     metroUi();
-    // IR
-    $("#wavInput").onchange = function (e) { loadWav(e.target.files[0]); e.target.value = ""; };
-    var dist = $("#irDist");
-    dist.oninput = function () { $("#irDistVal").textContent = dist.value + "%"; dist.style.setProperty("--p", dist.value + "%"); };
-    dist.oninput();
-    dist.onchange = function () {
-      if (CR.S.status.state !== "on") return;
-      CR.native("irDistance", { distance: Number(dist.value) }).catch(function (e) { CR.toast(e.message, true); });
-    };
-    v.querySelectorAll("[data-slot]").forEach(function (b) { b.onclick = function () { IR.slot = Number(b.dataset.slot); irUi(); }; });
-    $("#irSave").onclick = async function () {
-      var slotN = IR.slot + 2;
-      if (!(await CR.confirm("Salvar IR", 'Gravar "' + CR.esc(IR.data.name) + '" no slot ' + slotN + " do IR CAB? O gabinete que estava nesse slot será substituído.", "Gravar"))) return;
-      CR.busy(true, "Gravando no slot " + slotN);
-      try { await CR.native("irSave", { slot: IR.slot, samples: IR.data.samples, distance: Number(dist.value) }); CR.toast("IR salvo no slot " + slotN); }
-      catch (e) { CR.toast(e.message, true); }
-      finally { CR.busy(false); }
-    };
-    irUi();
+    // editor de IR, delay no tempo e modo ensaio
+    CR.IrLab.bind($("#irLab"));
+    CR.Delay.bindCard($("#delayCard"));
+    bindEnsaio();
     // presets
     $("#pSend").onclick = async function () {
       if (!CR.S.presets || CR.S.locked) return;
@@ -278,12 +203,13 @@ CR.Tools = (function () {
   }
 
   function refresh() {
+    paintEnsaio();
+    CR.IrLab.refresh();
     var on = CR.S.status.state === "on" && !!CR.S.presets;
     ["#pSend", "#pReload", "#pFactory"].forEach(function (s) { var b = $(s); if (b) b.disabled = !on; });
     var sw = document.querySelector("#loopSw .switch");
     if (sw) { sw.disabled = !on; sw.set(!!CR.S.status.loopback); }
-    irUi();
   }
 
-  return { render: render, refresh: refresh };
+  return { render: render, refresh: refresh, ensaioOn: function () { return ensaio; } };
 })();

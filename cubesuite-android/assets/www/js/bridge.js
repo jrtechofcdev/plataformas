@@ -65,6 +65,13 @@ var CR = window.CR || (window.CR = {});
           case "memSave": try { localStorage.setItem(a.name === "setlist" ? "cr.mock.setlist" : "cr.mock.mem", a.data); } catch (_) {} break;
           case "memExport": r = "CubeRemote-memorias-simulador.json"; break;
           case "memShare": break;
+          case "irRead": r = { distance: 0.5, samples: self.irSlots[a.slot] || self.fakeIr(a.slot) }; break;
+          case "irSave": self.irSlots[a.slot] = a.samples.slice(); break;
+          case "irPreview": self.irPreviewed = a.samples.slice(); break;
+          case "readMem": r = self.readMem(a.region, a.addr, a.len); if (r === null) { window.cubeResolve(id, false, "a pedaleira não respondeu (timeout)"); return; } break;
+          case "recordEnvelope": r = self.envelope(a.ms || 3000); break;
+          case "ensaioStart": setTimeout(function () { window.cubeEvent("status", { state: "ensaio", message: "Modo ensaio (simulado)" }); window.cubeEvent("ensaio", { on: true, output: true }); }, 200); break;
+          case "ensaioStop": setTimeout(function () { window.cubeEvent("ensaio", { on: false }); window.cubeEvent("status", self.state()); }, 200); break;
           case "factoryPresets": self.presets = FACTORY.map(function (x) { return x.slice(); }); r = self.presets; break;
           case "loopback": r = self.loop = a.on; break;
           case "getLog": r = "[simulador] log\n"; break;
@@ -77,6 +84,44 @@ var CR = window.CR || (window.CR = {});
         if (window.cubeLog && m !== "getLog" && m !== "haptic") window.cubeLog("[simulador] " + m + " " + json + "\n");
         window.cubeResolve(id, true, r);
       }, 25);
+    },
+    /* IR simulado: ruído que decai, diferente por slot */
+    irSlots: {}, irPreviewed: null,
+    fakeIr: function (slot) {
+      var out = [], seed = 7 + slot * 13, lp = 0;
+      for (var i = 0; i < 512; i++) {
+        seed = (seed * 16807) % 2147483647;
+        var n = seed / 2147483647 * 2 - 1;
+        lp += (n - lp) * (0.35 + slot * 0.05);
+        out.push(Math.round((i === 0 ? 0.9 : lp * 0.6 * Math.exp(-i / (40 + slot * 8))) * 1e5) / 1e5);
+      }
+      return out;
+    },
+    /* memória simulada: byte 0x15A da RAM guarda o footswitch ativo; 0x10 muda a cada leitura (ruído) */
+    active: 0, tick: 0,
+    press: function (p) { this.active = p; },
+    readMem: function (region, addr, len) {
+      if (addr >= 0x80000000) return null;
+      var out = [];
+      for (var i = 0; i < len; i++) {
+        var a = addr + i, v = (a * 37 + region * 11) & 0xFF;
+        if (region === 5 && a < 48) v = this.presets[Math.floor(a / 16)][a % 16];
+        if (region === 4 && a === 0x15A) v = this.active;
+        if (region === 4 && a === 0x10) v = (this.tick++) & 0xFF;
+        out.push(v);
+      }
+      return out;
+    },
+    /* eco simulado: TIME vira ms por uma tabela escondida (30 + 28 * TIME); o teste confere se o app acha */
+    envelope: function (ms) {
+      var D = 30 + 28 * this.presets[0][6], env = [], onset = 420, seed = 3;
+      for (var i = 0; i < ms; i++) {
+        seed = (seed * 16807) % 2147483647;
+        var v = 0.002 + 0.002 * seed / 2147483647;
+        for (var k = 0; k < 6; k++) { var t = i - onset - k * D; if (t >= 0) v += Math.pow(0.55, k) * 0.3 * Math.exp(-t / 12); }
+        env.push(v);
+      }
+      return env;
     },
     /* afinador simulado: passeia pelas 6 cordas, começando desafinado e chegando no ponto */
     startTuner: function (src) {

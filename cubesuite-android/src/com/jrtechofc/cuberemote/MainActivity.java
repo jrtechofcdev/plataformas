@@ -59,7 +59,7 @@ import java.util.concurrent.TimeUnit;
  * Tudo é registrado no log (AppLog), visível em Ajustes > Log.
  */
 public class MainActivity extends Activity {
-    static final String VERSION = "2.3.1";
+    static final String VERSION = "2.4.0";
     private static final int PICK_FILE = 41;
     private static final String ACTION_USB_PERMISSION = "com.jrtechofc.cuberemote.USB_PERMISSION";
 
@@ -85,7 +85,9 @@ public class MainActivity extends Activity {
     private boolean tunerWanted = false;
     private String tunerSource = "mic";
     // afinador pela entrada USB: o controle da pedaleira fica pausado enquanto ele estiver aberto
-    private volatile boolean usbTunerMode = false;
+    private volatile boolean usbTunerMode = false;      // controle pausado para o áudio USB (afinador ou ensaio)
+    private volatile boolean ensaioWanted = false;      // modo ensaio: tocar música do celular no fone da pedaleira
+    private volatile Boolean restoreLoopback = null;    // estado do USB Loopback para devolver ao sair do ensaio
     private volatile boolean reconnectAfterTuner = false;
     private String lastCubeUsbName = null;
     // botões de volume do celular (ou controle de selfie Bluetooth) funcionando como pedal (aba Culto)
@@ -221,19 +223,7 @@ public class MainActivity extends Activity {
     private void prepareUsbTuner() {
         if (!tunerWanted || !"usb".equals(tunerSource)) return;
         log.log("---------- Afinador USB ----------");
-        if (!usbTunerMode) {
-            usbTunerMode = true;
-            UsbDevice d = findCubeUsb();
-            if (cube != null) {
-                reconnectAfterTuner = true;
-                log.log("Pausando o controle da pedaleira para liberar o áudio USB.");
-                disconnect();
-                event("status", status("tuner", "Afinador USB em uso. Os controles voltam ao sair do afinador."));
-            }
-            if (d == null) log.log("Pedaleira não encontrada na lista USB.");
-            else if (!usb.hasPermission(d)) log.log("Sem permissão USB para religar o áudio.");
-            else rebindUsbAudio(d);
-        }
+        pauseForUsbAudio("tuner", "Afinador USB em uso. Os controles voltam ao sair do afinador.");
         AudioDeviceInfo in = null;
         for (int i = 0; i < 25 && in == null; i++) { in = tuner.findUsbInput(); if (in == null) sleep(200); }
         logAudioInputs();
@@ -242,9 +232,64 @@ public class MainActivity extends Activity {
         main.post(() -> { if (tunerWanted && "usb".equals(tunerSource)) startTunerNow("usb"); });
     }
 
+    /** Pausa o controle e devolve o áudio USB ao Android (afinador USB ou modo ensaio). Roda na fila "worker". */
+    private void pauseForUsbAudio(String state, String message) {
+        if (usbTunerMode) return;
+        usbTunerMode = true;
+        UsbDevice d = findCubeUsb();
+        if (cube != null) {
+            reconnectAfterTuner = true;
+            log.log("Pausando o controle da pedaleira para liberar o áudio USB.");
+            disconnect();
+            event("status", status(state, message));
+        }
+        if (d == null) log.log("Pedaleira não encontrada na lista USB.");
+        else if (!usb.hasPermission(d)) log.log("Sem permissão USB para religar o áudio.");
+        else rebindUsbAudio(d);
+    }
+
+    /*
+     * Modo ensaio: liga o USB Loopback (o áudio do celular sai na pedaleira, inclusive no fone),
+     * pausa o controle e devolve o áudio USB ao Android. Assim YouTube, Spotify ou o metrônomo
+     * tocam junto com a guitarra. Ao sair, reconecta e volta o Loopback como estava, para nenhum
+     * som do celular (notificações) ir para o som da igreja sem querer.
+     */
+    private void ensaioStart() {
+        ensaioWanted = true;
+        log.log("---------- Modo ensaio ----------");
+        if (cube != null && !usbTunerMode) {
+            try {
+                boolean was = cube.getLoopback();
+                if (!was) { cube.setLoopback(true); log.log("USB Loopback ligado para o ensaio."); }
+                restoreLoopback = was;
+            } catch (Exception e) { log.log("Não consegui ligar o USB Loopback: " + e.getMessage()); }
+        }
+        pauseForUsbAudio("ensaio", "Modo ensaio: o som do celular está saindo na pedaleira. Os controles voltam ao sair do ensaio.");
+        boolean out = false;
+        for (int i = 0; i < 25 && !out; i++) { out = usbOutputPresent(); if (!out) sleep(200); }
+        log.log(out ? "Saída de áudio USB pronta: o celular já toca na pedaleira." : "A saída de áudio USB não apareceu para o Android.");
+        try { event("ensaio", new JSONObject().put("on", true).put("output", out)); } catch (Exception ignored) {}
+    }
+
+    private void ensaioStop() {
+        ensaioWanted = false;
+        log.log("Modo ensaio encerrado.");
+        try { event("ensaio", new JSONObject().put("on", false)); } catch (Exception ignored) {}
+        endUsbTunerMode();
+    }
+
+    private boolean usbOutputPresent() {
+        android.media.AudioManager am = (android.media.AudioManager) getSystemService(Context.AUDIO_SERVICE);
+        for (AudioDeviceInfo a : am.getDevices(android.media.AudioManager.GET_DEVICES_OUTPUTS)) {
+            int t = a.getType();
+            if (t == AudioDeviceInfo.TYPE_USB_DEVICE || t == AudioDeviceInfo.TYPE_USB_HEADSET) return true;
+        }
+        return false;
+    }
+
     /** Sai do modo afinador USB (se não estiver mais em uso) e reconecta o controle. Roda na fila "worker". */
     private void endUsbTunerMode() {
-        if (!usbTunerMode || (tunerWanted && "usb".equals(tunerSource))) return;
+        if (!usbTunerMode || (tunerWanted && "usb".equals(tunerSource)) || ensaioWanted) return;
         usbTunerMode = false;
         if (reconnectAfterTuner) {
             reconnectAfterTuner = false;
@@ -424,9 +469,10 @@ public class MainActivity extends Activity {
     }
 
     private void connectNow() {
-        if (tunerWanted && "usb".equals(tunerSource)) {
-            // controlar agora derrubaria a entrada USB do afinador; reconecta quando ele fechar
+        if ((tunerWanted && "usb".equals(tunerSource)) || ensaioWanted) {
+            // controlar agora derrubaria o áudio USB (afinador ou ensaio); reconecta quando ele fechar
             reconnectAfterTuner = true;
+            if (ensaioWanted) { log.log("Conexão adiada: o modo ensaio está ligado."); event("status", status("ensaio", "Modo ensaio ligado. Os controles voltam ao sair do ensaio.")); return; }
             log.log("Conexão adiada: o afinador USB está aberto. O controle volta ao sair do afinador.");
             event("status", status("tuner", "Afinador USB em uso. Os controles voltam ao sair do afinador."));
             return;
@@ -535,6 +581,11 @@ public class MainActivity extends Activity {
 
     private void connected() {
         log.log("OK: CONECTADA via " + cubeSource + " — " + cube.model + String.format(" (ID 0x%04X, geração %d)", cube.productId, cube.generation));
+        if (restoreLoopback != null) {
+            try { cube.setLoopback(restoreLoopback); log.log("USB Loopback devolvido ao estado de antes do ensaio (" + (restoreLoopback ? "ligado" : "desligado") + ")."); }
+            catch (Exception e) { log.log("Não consegui devolver o USB Loopback: " + e.getMessage()); }
+            restoreLoopback = null;
+        }
         event("status", fullState());
     }
 
@@ -847,6 +898,31 @@ public class MainActivity extends Activity {
                     try { volumeKeys = new JSONObject(argsJson).optBoolean("on", false); } catch (Exception ignored) {}
                     log.log("Botões de volume como pedal: " + (volumeKeys ? "ligado" : "desligado"));
                     resolve(id, true, "null"); return;
+                case "jsLog":
+                    try { log.log(new JSONObject(argsJson).optString("text", "").replace('\n', ' ')); } catch (Exception ignored) {}
+                    resolve(id, true, "null"); return;
+                case "ensaioStart": worker.execute(MainActivity.this::ensaioStart); resolve(id, true, "null"); return;
+                case "ensaioStop": worker.execute(MainActivity.this::ensaioStop); resolve(id, true, "null"); return;
+                case "recordEnvelope": {
+                    if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                        main.post(() -> requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, REQ_MIC + 1));
+                        resolve(id, false, JSONObject.quote("Permita o uso do microfone e tente de novo."));
+                        return;
+                    }
+                    int ms = 3000;
+                    try { ms = new JSONObject(argsJson).optInt("ms", 3000); } catch (Exception ignored) {}
+                    final int dur = ms;
+                    if (tuner.isRunning()) tuner.stop();
+                    new Thread(() -> {
+                        try {
+                            float[] env = EnvelopeRecorder.record(dur);
+                            StringBuilder sb = new StringBuilder("[");
+                            for (int i = 0; i < env.length; i++) { if (i > 0) sb.append(','); sb.append(String.format(java.util.Locale.US, "%.5f", env[i])); }
+                            resolve(id, true, sb.append(']').toString());
+                        } catch (Exception e) { resolve(id, false, JSONObject.quote(String.valueOf(e.getMessage()))); }
+                    }, "envelope").start();
+                    return;
+                }
                 case "memLoad": resolve(id, true, JSONObject.quote(memLoad(storeName(argsJson)))); return;
                 case "memSave":
                     try { memSave(storeName(argsJson), new JSONObject(argsJson).getString("data")); resolve(id, true, "true"); }
@@ -921,6 +997,24 @@ public class MainActivity extends Activity {
                 case "loopback":
                     c.setLoopback(a.getBoolean("on"));
                     return String.valueOf(c.getLoopback());
+                case "irRead": {
+                    float[] dist = new float[1];
+                    float[] smp = c.irRead(a.getInt("slot"), dist);
+                    JSONArray arr = new JSONArray();
+                    for (float f : smp) arr.put((double) f);
+                    return new JSONObject().put("distance", (double) dist[0]).put("samples", arr).toString();
+                }
+                case "readMem": {
+                    // só leitura, para a ferramenta "Descobrir footswitch": regiões 0 (flash), 4 (RAM) e 5 (presets)
+                    int region = a.getInt("region");
+                    if (region != 0 && region != 4 && region != 5) throw new CubeDevice.DeviceException("região não permitida");
+                    long addr = a.getLong("addr");
+                    int len = Math.max(1, Math.min(1024, a.getInt("len")));
+                    byte[] b = c.read(region, addr, len);
+                    JSONArray arr = new JSONArray();
+                    for (byte x : b) arr.put(x & 0xFF);
+                    return arr.toString();
+                }
                 case "irPreview":
                     log.log("Enviando prévia de IR");
                     c.irPreview(floats(a.getJSONArray("samples")), a.getInt("distance"));
@@ -966,7 +1060,10 @@ public class MainActivity extends Activity {
     // Ficam num arquivo do app (memorias.json). A cada gravação o arquivo anterior vira memorias.bak.json.
     // Arquivos permitidos: memorias.json (aba Memórias) e setlist.json (aba Culto).
     private static String storeName(String argsJson) {
-        try { return "setlist".equals(new JSONObject(argsJson).optString("name")) ? "setlist" : "memorias"; }
+        try {
+            String n = new JSONObject(argsJson).optString("name");
+            return "setlist".equals(n) || "irbak".equals(n) ? n : "memorias";
+        }
         catch (Exception e) { return "memorias"; }
     }
 

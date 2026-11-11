@@ -12,7 +12,7 @@ CR.Stage = (function () {
     var pb = $("#presetBar");
     pb.innerHTML = CR.MODULES.map(function (m, i) {
       return '<button type="button" class="preset-btn" data-p="' + i + '" style="--led:var(--led-' + m.color + ')">' +
-        '<i class="led"></i><b>' + m.fs + '</b><span>Preset</span></button>';
+        '<i class="led"></i><b>' + m.fs + '</b><span>Preset</span><em class="pb-play">Tocando</em></button>';
     }).join("");
     pb.querySelectorAll(".preset-btn").forEach(function (b) {
       b.onclick = function () { if (CR.S.locked) return; CR.S.preset = Number(b.dataset.p); CR.haptic(); CR.emit("preset", CR.S.preset); };
@@ -62,7 +62,8 @@ CR.Stage = (function () {
     var v = CR.val(c), f = CR.format(c, v);
     b.querySelector(".t-val").textContent = f.short;
     b.querySelector(".t-sub").textContent = c.list ? CR[c.list][v].name :
-      (c.bipolar ? (v === c.zero ? "Desligado" : v < c.zero ? "Chorus" : "Phaser") : CR.prefs.display === "percent" ? "" : "de " + c.max);
+      (c.bipolar ? (v === c.zero ? "Desligado" : v < c.zero ? "Chorus" : "Phaser") :
+       c.key === "time" && CR.Delay && CR.Delay.calibrated() ? CR.Delay.msOf(v) + " ms" : CR.prefs.display === "percent" ? "" : "de " + c.max);
     b.querySelector(".t-bar i").setAttribute("style", barStyle(c, v));
     b.classList.toggle("on", CR.isActive(c));
     var m = CR.MODULES[c.module - 1];
@@ -79,6 +80,7 @@ CR.Stage = (function () {
       var sp = b.querySelector("span");
       sp.textContent = name || "Preset";
       b.classList.toggle("named", !!name);
+      b.classList.toggle("playing", CR.Follow && CR.Follow.playing() === i);
       b.setAttribute("aria-label", "Preset " + CR.MODULES[i].fs + (name ? ": " + name : ""));
     });
     document.querySelectorAll(".module-btn").forEach(function (b, i) {
@@ -99,6 +101,14 @@ CR.Stage = (function () {
     box.hidden = false;
     if (st.state === "search") {
       box.innerHTML = '<div class="state-card"><div class="spinner"></div><h2>Procurando a pedaleira</h2><p>' + CR.esc(st.message || "Verificando a conexão USB.") + "</p></div>";
+      return;
+    }
+    if (st.state === "ensaio") {
+      box.innerHTML = '<div class="state-card">' + CR.icon("headphones", "state-ico") + "<h2>Modo ensaio ligado</h2><p>" + CR.esc(st.message) + "</p>" +
+        '<div class="state-actions"><button class="btn primary big" type="button" data-act="stop">' + CR.icon("stop") + "<span>Sair do ensaio</span></button>" +
+        '<button class="btn big" type="button" data-act="tools">' + CR.icon("tools") + "<span>Ferramentas</span></button></div></div>";
+      box.querySelector('[data-act="stop"]').onclick = function () { CR.native("ensaioStop"); };
+      box.querySelector('[data-act="tools"]').onclick = function () { CR.App.go("tools"); };
       return;
     }
     if (st.state === "tuner") {
@@ -169,7 +179,7 @@ CR.Stage = (function () {
           '<div class="adj-about" hidden><p>' + CR.LEARN.controls[c.key].what + "</p><p>" + CR.LEARN.controls[c.key].use + "</p>" +
           '<button type="button" class="btn ghost" data-learn>' + CR.icon("learn") + "<span>Mais na aba Aprender</span></button></div>" +
         "</div>" +
-        '<div class="adj-right">' + body + "</div>" +
+        '<div class="adj-right">' + body + (c.key === "time" ? tapHtml() : "") + "</div>" +
       "</div>";
 
     if (!c.list) {
@@ -193,6 +203,7 @@ CR.Stage = (function () {
       b.onclick = function () { openAdjust((adj.idx + Number(b.dataset.nav) + CR.CONTROLS.length) % CR.CONTROLS.length); };
     });
     $("[data-close]", el).onclick = closeAdjust;
+    if (c.key === "time") bindTap(el);
     el.hidden = false;
     refreshAdjust();
     $(".adj-close", el).focus();
@@ -202,6 +213,39 @@ CR.Stage = (function () {
     var c = adj.c;
     v = Math.max(0, Math.min(c.max, Math.round(v)));
     if (CR.set(c.off, v)) CR.haptic();
+  }
+
+  /* ---------------------------------------------------------------- Tap do delay (só no TIME) */
+  var tapBpm = null;
+  function tapHtml() {
+    var fig = CR.store.get("cr.dl.fig", "dq");
+    return '<div class="tap-box"><div class="tap-row"><button type="button" class="tap-btn" data-tap>' + CR.icon("tap") + "<b>Tap</b></button>" +
+      '<p class="tap-info">' + (CR.Delay.calibrated() ? "Toque no tempo da música (2 a 6 toques)." : "Para o Tap funcionar, meça o delay uma vez em Ferramentas > Delay no tempo.") + "</p></div>" +
+      '<div class="seg" role="group" aria-label="Figura do delay">' + CR.Delay.FIGS.map(function (f) {
+        return '<button type="button" data-fig="' + f[0] + '" aria-pressed="' + (f[0] === fig) + '">' + f[1] + "</button>"; }).join("") + "</div></div>";
+  }
+  function bindTap(el) {
+    function applyFig() {
+      if (!tapBpm || !CR.Delay.calibrated()) return;
+      var fig = CR.store.get("cr.dl.fig", "dq"), ms = CR.Delay.msFor(tapBpm, fig), t = CR.Delay.timeFor(ms);
+      setV(t);
+      $(".tap-info", el).textContent = tapBpm + " BPM · " + CR.Delay.figName(fig) + " = " + Math.round(ms) + " ms → TIME " + t + " (" + CR.Delay.msOf(t) + " ms)";
+    }
+    $("[data-tap]", el).onclick = function () {
+      if (!CR.Delay.calibrated()) { CR.toast("Meça o delay primeiro em Ferramentas > Delay no tempo"); return; }
+      CR.haptic();
+      var r = CR.Delay.tap();
+      if (!r) { $(".tap-info", el).textContent = "Continue tocando no tempo"; return; }
+      tapBpm = r.bpm;
+      applyFig();
+    };
+    el.querySelectorAll("[data-fig]").forEach(function (b) {
+      b.onclick = function () {
+        CR.store.set("cr.dl.fig", b.dataset.fig);
+        el.querySelectorAll("[data-fig]").forEach(function (x) { x.setAttribute("aria-pressed", String(x === b)); });
+        applyFig();
+      };
+    });
   }
 
   /* −/+ : um passo no toque. Segurando, repete SEMPRE de 1 em 1 (nunca pula valores);
@@ -230,7 +274,8 @@ CR.Stage = (function () {
     if (!c || el.hidden) return;
     var v = CR.val(c), f = CR.format(c, v);
     $(".av-big", el).textContent = f.short;
-    $(".av-long", el).textContent = c.list ? CR[c.list][v].kind + " · " + f.long : f.long;
+    $(".av-long", el).textContent = c.list ? CR[c.list][v].kind + " · " + f.long : f.long +
+      (c.key === "time" && CR.Delay.calibrated() ? " · " + CR.Delay.msOf(v) + " ms" : "");
     if (adj.slider) adj.slider.update();
     el.querySelectorAll(".slot-btn, .quick-btn").forEach(function (b) { b.classList.toggle("active", Number(b.dataset.v) === v); });
     var on = CR.isActive(c), z = $(".zero-btn", el);
@@ -275,6 +320,7 @@ CR.Stage = (function () {
 
   CR.on("changed", refresh);
   CR.on("memories", refresh);
+  CR.on("playing", refresh);
   CR.on("preset", function () { if (adj.c) adj.start = CR.val(adj.c); refresh(); });
 
   return { render: render, refresh: refresh, showState: showState, openAdjust: openAdjust, closeAdjust: closeAdjust };

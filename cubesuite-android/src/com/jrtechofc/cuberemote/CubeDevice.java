@@ -371,6 +371,34 @@ public class CubeDevice {
         write(PRESETS, preset * PRESET_SIZE, d);
     }
 
+    /**
+     * Lê o IR gravado num slot (0 a 7 = posições 2 a 9 do IR CAB), no mesmo formato que irSave grava:
+     * 4 bytes de flag, distância (float) e 512 amostras (float). Só lê; nunca grava.
+     * distanceOut[0] recebe a distância. Se os números não fizerem sentido, recusa (formato diferente).
+     */
+    public synchronized float[] irRead(int slot, float[] distanceOut) throws Exception {
+        require(-1);
+        if (slot < 0 || slot >= IR_SLOTS) throw new DeviceException("slot inválido");
+        if (!irBaseOk(irBase)) throw new DeviceException("Endereço dos IRs não confirmado neste modelo: leitura bloqueada");
+        byte[] b = read(FLASH, irBase + (long) slot * BLOCK, 4 + 4 + IR_SAMPLES * 4);
+        ByteBuffer bb = ByteBuffer.wrap(b).order(ByteOrder.LITTLE_ENDIAN);
+        float dist = bb.getFloat(4);
+        boolean ok = !Float.isNaN(dist) && dist >= 0 && dist <= 2;
+        float[] out = new float[IR_SAMPLES];
+        float peak = 0;
+        for (int i = 0; i < IR_SAMPLES; i++) {
+            float v = bb.getFloat(8 + i * 4);
+            if (Float.isNaN(v) || Float.isInfinite(v) || Math.abs(v) > 16) ok = false;
+            out[i] = v;
+            peak = Math.max(peak, Math.abs(v));
+        }
+        if (!ok || peak == 0)
+            throw new DeviceException("O slot " + (slot + 2) + " não está no formato esperado (flag " + bb.getInt(0) + ")");
+        if (distanceOut != null && distanceOut.length > 0) distanceOut[0] = dist;
+        log(String.format("IR do slot %d lido (distância %.2f, pico %.3f)", slot + 2, dist, peak));
+        return out;
+    }
+
     public synchronized void irSave(int slot, float[] samples, int distance) throws Exception {
         require(-1);
         if (slot < 0 || slot >= IR_SLOTS) throw new DeviceException("slot inválido");

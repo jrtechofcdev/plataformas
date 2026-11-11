@@ -283,11 +283,30 @@ button { font: inherit; color: inherit; }
 .tr-str small { font: 600 10px var(--font-label); color: var(--muted); }
 .tr-str.on { border-color: var(--brand); color: var(--text); background: color-mix(in srgb, var(--brand) 16%, transparent); }
 .tr-msg { color: var(--danger); text-align: center; font-size: 14px; }
+.strobe { display: none; position: relative; width: 100%; max-width: 760px; height: clamp(62px, 10dvh, 92px); border-radius: 12px; overflow: hidden;
+  background: #0a0b0d; border: 1px solid var(--line); }
+.strobe-band { position: absolute; left: 0; right: 0; top: 0; height: 50%;
+  background: repeating-linear-gradient(90deg, var(--warn) 0 28px, transparent 28px 56px); background-position-x: var(--strobe, 0px); opacity: .9; }
+.strobe-band.b2 { top: 50%; background: repeating-linear-gradient(90deg, var(--warn) 0 14px, transparent 14px 28px); background-position-x: var(--strobe2, 0px); opacity: .55; }
+.tuner.in-tune .strobe-band { background-image: repeating-linear-gradient(90deg, var(--led-green) 0 28px, transparent 28px 56px); }
+.tuner.in-tune .strobe-band.b2 { background-image: repeating-linear-gradient(90deg, var(--led-green) 0 14px, transparent 14px 28px); }
+.tuner.idle .strobe-band { opacity: .15; }
+.tuner.strobe-mode .strobe { display: block; }
+.tuner.strobe-mode .meter { display: none; }
+.tu-list { display: grid; gap: 8px; }
+.tu-item { display: grid; gap: 2px; text-align: left; min-height: 56px; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--line-strong); background: var(--surface-2); cursor: pointer; }
+.tu-item b { font: 700 18px var(--font-label); }
+.tu-item span { color: var(--text-2); font-size: 14px; letter-spacing: 1px; }
+.tu-item.active { border-color: var(--brand); background: color-mix(in srgb, var(--brand) 12%, var(--surface-2)); }
+.tr-tuning { min-height: 48px; justify-content: flex-start; }
+.tr-tuning span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tr-note-usb { color: var(--text-2); text-align: center; font-size: 14px; max-width: 520px; }
-.tr-opts { display: flex; align-items: center; gap: var(--gap); }
+.tr-opts { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: var(--gap); }
+.tr-opts .stepper { justify-content: space-between; }
 .tr-opts .seg { flex: 1; }
-.tr-opts .seg button { min-height: 48px; font-size: 16px; white-space: nowrap; }
-.tr-opts .stepper b { min-width: 98px; }
+.tr-opts .seg button { min-height: 48px; min-width: 48px; font-size: 16px; white-space: nowrap; }
+.tr-opts .stepper b { min-width: 0; flex: 1; text-align: center; white-space: nowrap; }
+.tr-opts .stepper .step { flex: none; width: 48px; }
 @media (orientation: landscape) and (max-height: 560px) {
   .tr-display { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 32px; row-gap: 10px; align-content: center;
     grid-template-areas: "note cents" "note meter" "note arrows" "note strings" "msg msg" "usb usb"; padding: 12px 24px; }
@@ -296,12 +315,15 @@ button { font: inherit; color: inherit; }
   .tr-letter { font-size: clamp(100px, 40dvh, 200px); }
   .tr-cents { grid-area: cents; justify-self: center; }
   .meter { grid-area: meter; height: clamp(54px, 15dvh, 80px); }
+  .strobe { grid-area: meter; height: clamp(54px, 15dvh, 80px); }
+  .tr-opts { grid-template-columns: repeat(4, minmax(0, auto)); justify-content: stretch; }
   .tr-arrows { grid-area: arrows; }
   .tr-strings { grid-area: strings; justify-self: center; }
   .tr-msg { grid-area: msg; }
   .tr-str { width: 46px; height: 46px; }
 }
-@media (max-width: 380px) { .tr-opts { flex-direction: column; align-items: stretch; } .tr-opts .stepper { justify-content: center; } }
+@media (max-width: 380px) { .tr-opts .seg button { font-size: 14px; padding: 0 4px; } }
+@media (orientation: landscape) and (max-height: 560px) and (max-width: 760px) { .tr-opts .lg { display: none; } }
 
 /* ---------------------------------------------------------------- slider */
 .slider { position: relative; height: 32px; touch-action: none; cursor: ew-resize; display: flex; align-items: center; }
@@ -444,6 +466,63 @@ button { font: inherit; color: inherit; }
 .about-by { color: var(--brand); font: 600 16px var(--font-label); letter-spacing: .6px; margin-top: -8px; }
 .about-ver { color: var(--muted); font-size: 13px; }
 .about-copy { font-weight: 600; }
+
+/* Footswitch ativo */
+.tag-exp { font: 600 11px var(--font-label); letter-spacing: .5px; color: var(--warn); border: 1px solid rgba(242, 193, 78, .5); border-radius: 6px; padding: 1px 6px; vertical-align: 3px; }
+.fs-big { font-size: 96px !important; color: var(--led) !important; }
+.fs-cands { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.fs-cand { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 8px 12px; border-radius: 12px; border: 1px solid var(--line-strong); background: var(--surface-2); cursor: pointer; }
+.fs-cand input { width: 22px; height: 22px; accent-color: var(--brand); }
+.fs-cand span { display: grid; }
+.fs-cand b { font: 700 17px var(--font-label); }
+.fs-cand small { color: var(--text-2); font-size: 13px; }
+.pb-play { display: none; font: 700 11px var(--font-label); font-style: normal; letter-spacing: .6px; text-transform: uppercase; color: #06080a;
+  background: var(--led); border-radius: 6px; padding: 2px 6px; }
+.preset-btn.playing .pb-play { display: inline-block; }
+.preset-btn.playing .led { background: var(--led); box-shadow: 0 0 8px var(--led), 0 0 16px var(--led); }
+.preset-btn { position: relative; }
+.preset-btn.playing .pb-play { position: absolute; top: 4px; right: 6px; }
+
+/* Editor de IR */
+.file-btn { cursor: pointer; }
+.ir-work { display: grid; gap: 12px; }
+.ir-src { display: grid; gap: 2px; }
+.ir-src b { font: 700 18px var(--font-label); overflow-wrap: anywhere; }
+.ir-src small { color: var(--muted); font-size: 13px; }
+#irResp { width: 100%; height: auto; aspect-ratio: 900 / 260; background: #0a0b0d; border: 1px solid var(--line); border-radius: 10px; }
+.ir-legend { display: flex; align-items: center; gap: 8px; margin-top: -4px; }
+.ir-legend i { display: inline-block; width: 18px; height: 3px; border-radius: 2px; }
+.lg-now { background: var(--led-green); } .lg-ref { background: #4a5260; margin-left: 10px; }
+.ir-starts { display: flex; flex-wrap: wrap; gap: 6px; }
+.ir-starts .chip-btn { min-height: 44px; }
+.ir-hint { color: var(--muted); font-size: 12.5px; }
+.ir-bak-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.ir-bak-list li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border-radius: 10px; background: var(--surface-2); }
+.ir-bak-list li div { display: grid; min-width: 0; }
+.ir-bak-list b { font: 700 16px var(--font-label); }
+.ir-bak-list span { font-size: 13px; color: var(--text-2); overflow-wrap: anywhere; }
+.slots button:disabled { opacity: .35; }
+
+/* Delay no tempo */
+.dl-step { display: grid; justify-items: center; gap: 10px; padding: 10px 0; text-align: center; }
+.dl-count { font: 700 72px/1 var(--font-label); color: var(--led-blue); font-variant-numeric: tabular-nums; }
+.dl-count.go { color: var(--brand); }
+.dl-msg { font: 600 19px var(--font-label); color: var(--text) !important; }
+.dl-progress { width: 100%; height: 8px; border-radius: 4px; background: var(--surface-2); overflow: hidden; }
+.dl-progress i { display: block; height: 100%; background: var(--led-blue); }
+.dl-table summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; color: var(--text-2); font: 600 15px var(--font-label); }
+.dl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 6px; }
+.dl-grid span { display: flex; justify-content: space-between; gap: 6px; padding: 6px 8px; border-radius: 8px; background: var(--surface-2); font-size: 13px; font-variant-numeric: tabular-nums; }
+.dl-grid b { color: var(--led-blue); font-family: var(--font-label); }
+.dl-bpm { justify-content: center; }
+.dl-bpm b { min-width: 96px; }
+.tap-box { order: 3; display: grid; gap: 8px; }
+.tap-row { display: flex; align-items: center; gap: 12px; }
+.tap-btn { flex: none; width: 96px; min-height: 64px; display: grid; place-items: center; gap: 2px; border-radius: 16px; cursor: pointer;
+  border: 2px solid var(--led); background: color-mix(in srgb, var(--led) 12%, var(--surface)); }
+.tap-btn b { font: 700 18px var(--font-label); }
+.tap-btn:active { transform: scale(.96); background: color-mix(in srgb, var(--led) 30%, var(--surface)); }
+.tap-info { color: var(--text-2); font-size: 14px; }
 
 /* Culto: música atual, ao vivo, setlist */
 .culto-page { gap: 14px; }

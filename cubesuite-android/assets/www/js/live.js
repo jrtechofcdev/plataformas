@@ -25,13 +25,19 @@ CR.Live = (function () {
     saved = { vol: [0, 1, 2].map(function (p) { return CR.S.presets[p][VOL]; }),
               mod2: [0, 1, 2].map(function (p) { return CR.S.presets[p][MOD2]; }) };
   }
+  /* Com o footswitch ativo descoberto (Ajustes > Footswitch ativo), as ações podem valer só para ele. */
+  function inScope(p) {
+    var pl = CR.Follow ? CR.Follow.playing() : null;
+    return CR.prefs.liveOne === false || pl === null || pl === p;
+  }
   /* Volume que cada preset deve ter agora (sem contar a animação). */
   function targetVol(p) {
+    if (!inScope(p)) return saved.vol[p];
     if (muted) return 0;
     var v = saved.vol[p];
     return boost ? Math.min(127, v + Math.round(127 * cfg.boost / 100)) : v;
   }
-  function targetMod2(p) { return boost && cfg.boostDelay ? 1 : saved.mod2[p]; }
+  function targetMod2(p) { return inScope(p) && boost && cfg.boostDelay ? 1 : saved.mod2[p]; }
 
   function write(p, off, v, force) { CR.setAt(p, off, v, { force: force }); }
 
@@ -79,8 +85,8 @@ CR.Live = (function () {
     if (!ready(force)) return;
     capture();
     muted = false;
-    var to = [0, 1, 2].map(targetVol), from = [0, 0, 0];
-    for (var p = 0; p < 3; p++) { write(p, VOL, 0, force); write(p, MOD2, targetMod2(p), force); }
+    var to = [0, 1, 2].map(targetVol), from = [0, 1, 2].map(function (p) { return inScope(p) ? 0 : to[p]; });
+    for (var p = 0; p < 3; p++) { write(p, VOL, from[p], force); write(p, MOD2, targetMod2(p), force); }
     CR.haptic();
     ramp("swell", from, to, function () { if (!boost) saved = null; }, force);
   }
@@ -89,8 +95,9 @@ CR.Live = (function () {
     if (!ready(force)) return;
     capture();
     var from = [0, 1, 2].map(function (p) { return CR.S.presets[p][VOL]; });
+    var to = [0, 1, 2].map(function (p) { return inScope(p) ? 0 : saved.vol[p]; });
     CR.haptic();
-    ramp("fade", from, [0, 0, 0], function () { muted = true; }, force);
+    ramp("fade", from, to, function () { muted = true; }, force);
   }
 
   /* Volta tudo ao normal (antes de carregar música ou memória). */
@@ -109,6 +116,8 @@ CR.Live = (function () {
     paint();
     CR.toast("Ações ao vivo desligadas: você mexeu no volume.");
   });
+  /* Trocou de footswitch com Boost ou Mudo ligado: a ação passa para o novo e o anterior volta ao normal. */
+  CR.on("playing", function () { if (saved && !anim) apply(true); });
   CR.on("status", function (st) { if (st.state !== "on") { stopAnim(); saved = null; muted = boost = false; paint(); } });
 
   /* ---------------------------------------------------------------- tela */

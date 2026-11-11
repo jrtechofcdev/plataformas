@@ -193,7 +193,7 @@ CR.store = {
   get: function (k, d) { try { var v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (_) { return d; } },
   set: function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} },
 };
-CR.prefs = Object.assign({ display: "steps", orientation: "auto", haptics: true, tunerSource: "mic", a4: 440 },
+CR.prefs = Object.assign({ display: "steps", tuning: "std", tunerView: "needle", orientation: "auto", haptics: true, tunerSource: "mic", a4: 440 },
                          CR.store.get("cr.prefs", {}));
 CR.savePrefs = function () { CR.store.set("cr.prefs", CR.prefs); };
 

@@ -33,9 +33,9 @@ CR.App = (function () {
     if (st.factory) CR.S.factory = st.factory;
     if (st.state !== "on") CR.S.presets = null;
     var chip = $("#btnStatus");
-    chip.className = "chip " + (st.state === "on" ? (st.mock ? "sim" : "on") : st.state === "search" || st.state === "tuner" ? "search" : "off");
+    chip.className = "chip " + (st.state === "on" ? (st.mock ? "sim" : "on") : st.state === "search" || st.state === "tuner" || st.state === "ensaio" ? "search" : "off");
     chip.querySelector("span").textContent = st.state === "on" ? (st.mock ? "Simulação" : "Conectada") : st.state === "search" ? "Procurando" :
-      st.state === "tuner" ? "Afinador USB" : "Desconectada";
+      st.state === "tuner" ? "Afinador USB" : st.state === "ensaio" ? "Modo ensaio" : "Desconectada";
     if (st.warning) CR.toast(st.warning, true);
     CR.Stage.showState(st);
     if (CR.S.presets) CR.Stage.refresh();
@@ -88,6 +88,8 @@ CR.App = (function () {
     CR.Culto.init();
     CR.Stage.showState(CR.S.status);
     CR.on("status", applyStatus);
+    CR.on("followcfg", function () { if (document.getElementById("app").dataset.view === "settings") CR.Settings.render(); });
+    CR.on("delaycal", function () { if (rendered.tools) CR.Tools.render(); CR.Stage.refresh(); });
     CR.native("setOrientation", { mode: CR.prefs.orientation }).catch(function () {});
     CR.native("state").then(function (st) {
       applyStatus(st);

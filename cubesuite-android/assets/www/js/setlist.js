@@ -26,7 +26,7 @@ CR.Culto = (function () {
       var bpm = Math.round(Number(s.bpm) || 0);
       return { id: s.id || newId(), name: String(s.name || "Música").trim().slice(0, 60), key: String(s.key || "").slice(0, 4),
                bpm: bpm >= 30 && bpm <= 250 ? bpm : 0, notes: String(s.notes || "").slice(0, 300),
-               A: s.A || "", B: s.B || "", C: s.C || "" };
+               A: s.A || "", B: s.B || "", C: s.C || "", delay: ["q", "dq", "e"].indexOf(s.delay) >= 0 ? s.delay : "" };
     });
     d.current = Math.max(-1, Math.min(d.songs.length - 1, Number(o.current) >= -1 ? Number(o.current) : -1));
     return d;
@@ -47,6 +47,7 @@ CR.Culto = (function () {
     var parts = [];
     if (s.key) parts.push("Tom " + s.key);
     if (s.bpm) parts.push(s.bpm + " BPM");
+    if (s.delay && s.bpm) parts.push("delay " + CR.Delay.figName(s.delay).toLowerCase());
     return parts.join(" · ");
   }
   function soundName(ref) {
@@ -82,6 +83,7 @@ CR.Culto = (function () {
         await CR.applyValues(p, m.values, { force: force });
         if (first < 0) first = p;
       }
+      if (s.delay && s.bpm) CR.Delay.applyBpm(s.bpm, s.delay, { force: force, quiet: true });
       data.current = i;
       persist();
       if (first >= 0) { CR.S.preset = first; CR.emit("preset", first); }
@@ -190,7 +192,7 @@ CR.Culto = (function () {
   }
 
   function editDialog(i) {
-    var s = i >= 0 ? data.songs[i] : { name: "", key: "", bpm: 0, notes: "", A: "", B: "", C: "" };
+    var s = i >= 0 ? data.songs[i] : { name: "", key: "", bpm: 0, notes: "", A: "", B: "", C: "", delay: "" };
     var mems = CR.Memory.options().length > 3;
     CR.dialog("white", i >= 0 ? "Editar música" : "Nova música", i >= 0 ? "Posição " + (i + 1) + " na setlist" : "Entra no fim da setlist",
       '<label class="field"><span class="field-head"><span>Nome da música</span></span><input class="text-input" id="sgName" maxlength="60" autocomplete="off" value="' + CR.esc(s.name) + '" placeholder="Ex.: Bondade de Deus"></label>' +
@@ -201,6 +203,10 @@ CR.Culto = (function () {
         return '<label class="field abc-field" style="--led:var(--led-' + CR.MODULES[p].color + ')"><span class="field-head"><span><i class="led on"></i>Footswitch ' + L + "</span></span>" +
           '<select class="text-input" id="sg' + L + '">' + soundOptions(s[L]) + "</select></label>";
       }).join("") +
+      '<label class="field"><span class="field-head"><span>Delay no tempo da música</span></span><select class="text-input" id="sgDelay">' +
+        [["", "Não mexer no TIME"]].concat(CR.Delay.FIGS.map(function (f) { return [f[0], f[1]]; })).map(function (o) {
+          return '<option value="' + o[0] + '"' + (o[0] === (s.delay || "") ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + "</select></label>" +
+      (CR.Delay.calibrated() ? "" : '<p class="hint">Para o delay no tempo funcionar, meça o delay uma vez em Ferramentas > Delay no tempo. Precisa do BPM preenchido.</p>') +
       '<label class="field"><span class="field-head"><span>Anotações</span></span><textarea class="text-input" id="sgNotes" rows="2" maxlength="300" placeholder="Ex.: solo no 2º refrão, usar B">' + CR.esc(s.notes) + "</textarea></label>" +
       (i >= 0 ? '<div class="mem-menu">' +
         '<button class="btn big" type="button" data-m="up"' + (i === 0 ? " disabled" : "") + ">" + CR.icon("up") + "<span>Subir</span></button>" +
@@ -217,7 +223,7 @@ CR.Culto = (function () {
       if (!name) { CR.toast("Dê um nome para a música", true); $("#sgName").focus(); return; }
       var bpm = Math.round(Number($("#sgBpm").value) || 0);
       var o = { id: s.id || newId(), name: name.slice(0, 60), key: $("#sgKey").value, bpm: bpm >= 30 && bpm <= 250 ? bpm : 0,
-                notes: $("#sgNotes").value.trim().slice(0, 300), A: $("#sgA").value, B: $("#sgB").value, C: $("#sgC").value };
+                notes: $("#sgNotes").value.trim().slice(0, 300), A: $("#sgA").value, B: $("#sgB").value, C: $("#sgC").value, delay: $("#sgDelay").value };
       if (i >= 0) data.songs[i] = o; else data.songs.push(o);
       d.hidden = true;
       persist(); render();

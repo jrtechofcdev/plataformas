@@ -4,7 +4,7 @@ App Android para controlar a pedaleira **Cube Baby** pelo cabo USB (OTG), em tem
 em pé ou deitado. Criado do zero por José Renato (Jr_Tech_OFC).
 © 2026 José Renato · Jr_Tech_OFC. Todos os direitos reservados (veja `LICENSE`).
 
-## Funções (versão 2.3 · modo culto, memórias e setlist)
+## Funções (versão 2.4)
 Feito para mexer rápido e com precisão durante o culto, com botões grandes.
 - **Palco** (tela principal, nunca rola):
   - **Presets A, B, C** em botões grandes (LED verde, azul, vermelho, como na pedaleira).
@@ -44,20 +44,28 @@ Feito para mexer rápido e com precisão durante o culto, com botões grandes.
   - Os botões A, B, C do Palco mostram o nome da memória carregada em cada um.
   - Backup: salvar na pasta Download, enviar (WhatsApp, e-mail, Drive) e importar
     (arquivo ou texto colado). Arquivo do app: `memorias.json`, com cópia automática `memorias.bak.json`.
-- **Afinador** em aba própria: nota gigante, ponteiro largo, cents, Hz, cordas E A D G B E,
-  microfone ou entrada USB, A4 de 430 a 450 Hz.
-  - Pela **entrada USB**, o app pausa os controles enquanto o afinador está aberto e reconecta
-    sozinho ao sair. Motivo: a pedaleira é um único aparelho USB (áudio + MIDI). Para mandar os
-    ajustes o app toma a interface MIDI, e o Android (driver snd-usb-audio do Linux) desliga junto
-    a placa de áudio dela. O afinador USB devolve as interfaces ao Android para a placa voltar.
-- **Ferramentas**: metrônomo com tap tempo, importação de IR (.wav), reenviar preset,
-  ler presets, presets de fábrica e USB Loopback.
+- **Afinador** em aba própria: nota gigante, ponteiro ou **estroboscópio** (mostra menos de 1 cent),
+  **afinações** Padrão, Meio tom abaixo, Um tom abaixo, Drop D, Drop C, Open G, DADGAD e Cromático,
+  microfone ou entrada USB (pausa os controles enquanto aberto), A4 de 430 a 450 Hz.
+- **Ferramentas**:
+  - **Editor de IR**: abre um .wav (converte para 48 kHz) ou **lê o gabinete de um slot da pedaleira**;
+    corte de grave, graves, médios, presença, corte de agudo e volume, com curva de resposta e
+    **prévia ao vivo**. Antes de gravar, guarda uma cópia do slot (irbak.json) e permite voltar.
+  - **Delay no tempo**: medição guiada pelo microfone (nota abafada, 8 posições) para saber os
+    milissegundos de cada TIME. Depois: **Tap** e figuras (semínima, colcheia pontuada, colcheia) no
+    ajuste do TIME, teste por BPM e delay automático em cada música da setlist.
+  - **Modo ensaio**: liga o USB Loopback e solta o cabo para tocar YouTube/Spotify no fone da
+    pedaleira; ao sair reconecta e devolve o Loopback como estava.
+  - Metrônomo com tap, reenviar/ler presets, presets de fábrica e USB Loopback.
 - **Aprender** (em Ajustes): controles, módulos, combinações, os 9 TYPE e os 9 IR CAB, modos e receitas.
-- **Ajustes**: orientação, vibração, afinador, conexão, log e Sobre.
+- **Ajustes**: orientação, valores (passos ou %), vibração, afinador, conexão, log e Sobre.
+  - **Footswitch ativo (experimental)**: 5 capturas da memória (A, B, C, A, B, só leitura) para achar
+    onde a pedaleira guarda o footswitch ativo. Achando, o Palco mostra "Tocando", pode seguir a
+    pedaleira e as ações ao vivo agem só no footswitch que toca. As capturas vão para o log.
 - Desfazer e **trava de palco** (segurar o cadeado 1 s para destravar) no topo.
 
 ## Instalar
-1. Copie `CubeRemote-2.3.1.apk` para o celular e abra (permita "fontes desconhecidas").
+1. Copie `CubeRemote-2.4.0.apk` para o celular e abra (permita "fontes desconhecidas").
    Instala por cima das versões anteriores (mesma chave de assinatura).
 2. Ligue a pedaleira com cabo USB + adaptador OTG. O app conecta sozinho.
 3. Na primeira vez que abrir o afinador, permita o uso do microfone.
@@ -73,7 +81,7 @@ IR CAB e os módulos 1, 2 e 3 nos bytes 10, 11 e 12.
 ## Gerar o APK (sem Android Studio)
 ```bash
 sdkmanager "platforms;android-34" "build-tools;35.0.0"
-ANDROID_HOME=~/android-sdk ./build.sh        # gera dist/CubeRemote-2.3.1.apk
+ANDROID_HOME=~/android-sdk ./build.sh        # gera dist/CubeRemote-2.4.0.apk
 ```
 A assinatura usa `~/.cuberemote.jks`. Guarde esse arquivo: sem ele, uma versão nova não instala por cima.
 
@@ -92,6 +100,9 @@ cubesuite-android/
 │   ├── js/memory.js          aba Memórias (10 sons, fábrica e backup)
 │   ├── js/setlist.js         aba Culto (setlist e pedal Bluetooth)
 │   ├── js/live.js            Boost, Mudo, Swell e Fade out
+│   ├── js/irlab.js           editor de IR
+│   ├── js/delay.js           delay no tempo (medição, Tap, BPM)
+│   ├── js/discover.js        footswitch ativo (experimental)
 │   ├── js/tuner.js           aba Afinador
 │   ├── js/learn-data.js      textos da aba Aprender e do "O que é"
 │   ├── js/learn.js, tools.js, settings.js, app.js, icons.js, bridge.js
@@ -103,6 +114,7 @@ cubesuite-android/
 │   ├── MidiLink.java / UsbRawLink.java / SysexAssembler.java   transporte USB
 │   ├── PitchDetector.java    detecção de nota (YIN)
 │   ├── TunerEngine.java      gravação de áudio do afinador
+│   ├── EnvelopeRecorder.java nível do som a cada 1 ms (medição do delay)
 │   └── AppLog.java           log
 ├── tests/                    testes no computador (protocolo e afinador)
 └── build.sh                  compila e assina o APK
