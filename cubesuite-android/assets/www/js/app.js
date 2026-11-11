@@ -21,6 +21,7 @@ CR.App = (function () {
     if (view === "tools") { if (!rendered.tools) { CR.Tools.render(); rendered.tools = true; } else CR.Tools.refresh(); }
     if (view === "settings") CR.Settings.render();
     if (view === "tuner") CR.Tuner.start();
+    if (view === "memory") CR.Memory.render();
     if (anchor && view === "learn") setTimeout(function () { CR.Learn.scrollTo(anchor); }, 30);
   }
 
@@ -28,6 +29,7 @@ CR.App = (function () {
   function applyStatus(st) {
     CR.S.status = st;
     if (st.state === "on" && st.presets) CR.S.presets = st.presets;
+    if (st.factory) CR.S.factory = st.factory;
     if (st.state !== "on") CR.S.presets = null;
     var chip = $("#btnStatus");
     chip.className = "chip " + (st.state === "on" ? (st.mock ? "sim" : "on") : st.state === "search" || st.state === "tuner" ? "search" : "off");
@@ -38,6 +40,7 @@ CR.App = (function () {
     if (CR.S.presets) CR.Stage.refresh();
     else CR.Stage.closeAdjust();
     if (rendered.tools) CR.Tools.refresh();
+    CR.Memory.refresh();
     if (document.getElementById("app").dataset.view === "settings") CR.Settings.render();
   }
 
@@ -80,6 +83,7 @@ CR.App = (function () {
     document.querySelectorAll(".nav button").forEach(function (b) { b.onclick = function () { go(b.dataset.go); }; });
     initLock();
     CR.Stage.render();
+    CR.Memory.init();
     CR.Stage.showState(CR.S.status);
     CR.on("status", applyStatus);
     CR.native("setOrientation", { mode: CR.prefs.orientation }).catch(function () {});

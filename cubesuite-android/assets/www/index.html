@@ -26,6 +26,7 @@
     <!-- navegação -->
     <nav class="nav" aria-label="Seções">
       <button data-go="stage" class="active" type="button"><span class="nav-ico" data-icon="pedal"></span><span>Palco</span></button>
+      <button data-go="memory" type="button"><span class="nav-ico" data-icon="memory"></span><span>Memórias</span></button>
       <button data-go="tuner" type="button"><span class="nav-ico" data-icon="tuner"></span><span>Afinador</span></button>
       <button data-go="tools" type="button"><span class="nav-ico" data-icon="tools"></span><span>Ferramentas</span></button>
       <button data-go="learn" type="button"><span class="nav-ico" data-icon="learn"></span><span>Aprender</span></button>
@@ -42,6 +43,9 @@
         </div>
         <div id="stageState" class="stage-state" hidden></div>
       </section>
+
+      <!-- ============ MEMÓRIAS ============ -->
+      <section id="view-memory" class="view scroll" aria-label="Memórias"></section>
 
       <!-- ============ AFINADOR ============ -->
       <section id="view-tuner" class="view" aria-label="Afinador"></section>
@@ -84,6 +88,7 @@
   <script src="js/learn-data.js"></script>
   <script src="js/stage.js"></script>
   <script src="js/tuner.js"></script>
+  <script src="js/memory.js"></script>
   <script src="js/learn.js"></script>
   <script src="js/tools.js"></script>
   <script src="js/settings.js"></script>

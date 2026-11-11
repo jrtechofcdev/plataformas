@@ -40,6 +40,13 @@ CR.ICONS = {
   usb: '<path d="M12 2.5v15"/><path d="M9 5.5 12 2.5l3 3"/><path d="M12 13 7.5 10.5V8M12 15.5l4.5-2.5V11"/><circle cx="12" cy="19.5" r="2"/>',
   check: '<path d="m4.5 12.5 5 5 10-11"/>',
   chevron: '<path d="m9 5.5 6.5 6.5L9 18.5"/>',
+  // memórias: cartões empilhados com linhas
+  memory: '<rect x="3.5" y="7" width="13" height="14" rx="1"/><path d="M7.5 3.5h13v13.5"/><path d="M7 12h6M7 16h4"/>',
+  more: '<circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/>',
+  save: '<path d="M12 3.5V15"/><path d="m7 10 5 5 5-5"/><path d="M4 14v6.5h16V14"/>',
+  edit: '<path d="M4 20h4L19.5 8.5l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>',
+  up: '<path d="m5.5 15 6.5-6.5 6.5 6.5"/>',
+  down: '<path d="m5.5 9 6.5 6.5L18.5 9"/>',
 };
 
 CR.icon = function (name, cls) {

@@ -45,7 +45,7 @@ var CR = window.CR || (window.CR = {});
     state: function () {
       return this.on ? { state: "on", mock: true, model: "Cube Baby", name: "SINCO-CubeBaby",
         version: "01.13.14.15.16.17.18.19", productId: "0x4F06", generation: 2, irWritable: true,
-        device: "Simulador", presets: JSON.parse(JSON.stringify(this.presets)), loopback: this.loop }
+        device: "Simulador", presets: JSON.parse(JSON.stringify(this.presets)), factory: FACTORY, loopback: this.loop }
         : { state: "off", message: "Simulador desligado" };
     },
     call: function (id, m, json) {
@@ -61,6 +61,10 @@ var CR = window.CR || (window.CR = {});
           case "param": self.presets[a.preset][a.offset] = a.value; self.log.push(a); break;
           case "presets": r = self.presets; break;
           case "sendPreset": self.presets[a.preset] = a.values.slice(); r = JSON.parse(JSON.stringify(self.presets)); break;
+          case "memLoad": try { r = localStorage.getItem("cr.mock.mem") || ""; } catch (_) { r = ""; } break;
+          case "memSave": try { localStorage.setItem("cr.mock.mem", a.data); } catch (_) {} break;
+          case "memExport": r = "CubeRemote-memorias-simulador.json"; break;
+          case "memShare": break;
           case "factoryPresets": self.presets = FACTORY.map(function (x) { return x.slice(); }); r = self.presets; break;
           case "loopback": r = self.loop = a.on; break;
           case "getLog": r = "[simulador] log\n"; break;

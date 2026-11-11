@@ -311,6 +311,14 @@ public class CubeDevice {
         write(PRESETS, LIVE | (preset * PRESET_SIZE + offset), new byte[]{(byte) value});
     }
 
+    /** Tabela dos 3 presets de fábrica deste modelo (sem gravar nada). */
+    public int[][] factoryTable() {
+        int[] src = productId == 0x4F09 ? FACTORY_4F09 : FACTORY;
+        int[][] out = new int[3][PRESET_SIZE];
+        for (int i = 0; i < 3; i++) System.arraycopy(src, i * PRESET_SIZE, out[i], 0, PRESET_SIZE);
+        return out;
+    }
+
     public synchronized int[][] factoryPresets() throws Exception {
         require(2);
         int[] src = productId == 0x4F09 ? FACTORY_4F09 : FACTORY;

@@ -74,6 +74,12 @@ CR.Stage = (function () {
     document.querySelectorAll(".preset-btn").forEach(function (b, i) {
       b.classList.toggle("active", i === CR.S.preset);
       b.setAttribute("aria-pressed", String(i === CR.S.preset));
+      // nome da memória carregada neste preset (aba Memórias), se houver
+      var name = CR.S.presets && CR.Memory ? CR.Memory.nameFor(i) : "";
+      var sp = b.querySelector("span");
+      sp.textContent = name || "Preset";
+      b.classList.toggle("named", !!name);
+      b.setAttribute("aria-label", "Preset " + CR.MODULES[i].fs + (name ? ": " + name : ""));
     });
     document.querySelectorAll(".module-btn").forEach(function (b, i) {
       var on = CR.moduleOn(CR.MODULES[i]);
@@ -261,6 +267,7 @@ CR.Stage = (function () {
   document.addEventListener("keydown", function (e) { if (e.key === "Escape") window.cubeBack(); });
 
   CR.on("changed", refresh);
+  CR.on("memories", refresh);
   CR.on("preset", function () { if (adj.c) adj.start = CR.val(adj.c); refresh(); });
 
   return { render: render, refresh: refresh, showState: showState, openAdjust: openAdjust, closeAdjust: closeAdjust };

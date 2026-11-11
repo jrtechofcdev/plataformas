@@ -122,9 +122,35 @@ CR.set = function (offset, value, opts) {
   return true;
 };
 
+/* Carrega um som inteiro (memória ou fábrica) num preset A, B ou C da pedaleira.
+   Grava os bytes 0 a 12 (controles e módulos); os bytes 13 a 15 do preset ficam como estão.
+   O preset anterior vai para o desfazer, então o botão Desfazer do topo volta tudo de uma vez. */
+CR.applyValues = async function (preset, values, opts) {
+  if (!CR.S.presets) throw new Error("Pedaleira não conectada");
+  if (CR.S.locked) throw new Error("Controles travados");
+  var cur = CR.S.presets[preset].slice(), next = cur.slice();
+  for (var i = 0; i <= 12; i++) next[i] = values[i];
+  CR.S.presets = await CR.native("sendPreset", { preset: preset, values: next });
+  if (!(opts && opts.noUndo)) {
+    CR.S.undo.push({ preset: preset, values: cur, t: Date.now() });
+    if (CR.S.undo.length > 60) CR.S.undo.shift();
+  }
+  CR.S.preset = preset;
+  CR.emit("preset", preset);
+  return true;
+};
+
 CR.undo = function () {
   var u = CR.S.undo.pop();
   if (!u) { CR.toast("Nada para desfazer"); return; }
+  if (u.values) {
+    CR.busy(true, "Desfazendo");
+    CR.applyValues(u.preset, u.values, { noUndo: true })
+      .then(function () { CR.toast("Preset " + "ABC"[u.preset] + " voltou ao som anterior"); })
+      .catch(function (e) { CR.toast(e.message, true); })
+      .finally(function () { CR.busy(false); });
+    return;
+  }
   CR.S.preset = u.preset;
   CR.set(u.offset, u.prev, { noUndo: true });
   CR.emit("preset", CR.S.preset);

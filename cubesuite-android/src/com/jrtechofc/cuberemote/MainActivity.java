@@ -59,7 +59,7 @@ import java.util.concurrent.TimeUnit;
  * Tudo é registrado no log (AppLog), visível em Ajustes > Log.
  */
 public class MainActivity extends Activity {
-    static final String VERSION = "2.1.1";
+    static final String VERSION = "2.2.0";
     private static final int PICK_FILE = 41;
     private static final String ACTION_USB_PERMISSION = "com.jrtechofc.cuberemote.USB_PERMISSION";
 
@@ -760,6 +760,7 @@ public class MainActivity extends Activity {
             o.put("appVersion", VERSION);
             if (c.generation == 2) {
                 o.put("presets", presetsJson(c.readPresets()));
+                o.put("factory", presetsJson(c.factoryTable()));
                 o.put("loopback", c.getLoopback());
             }
         } catch (Exception e) {
@@ -825,6 +826,19 @@ public class MainActivity extends Activity {
                     resolve(id, true, "null"); return;
                 }
                 case "tunerStop": stopTuner(); resolve(id, true, "null"); return;
+                case "memLoad": resolve(id, true, JSONObject.quote(memLoad())); return;
+                case "memSave":
+                    try { memSave(new JSONObject(argsJson).getString("data")); resolve(id, true, "true"); }
+                    catch (Exception e) { log.log("Erro ao salvar memórias: " + e); resolve(id, false, JSONObject.quote("Não consegui salvar as memórias: " + e.getMessage())); }
+                    return;
+                case "memExport":
+                    try { resolve(id, true, JSONObject.quote(memExport(new JSONObject(argsJson).getString("data")))); }
+                    catch (Exception e) { log.log("Erro no backup: " + e); resolve(id, false, JSONObject.quote(String.valueOf(e.getMessage()))); }
+                    return;
+                case "memShare":
+                    try { memShare(new JSONObject(argsJson).getString("data")); resolve(id, true, "true"); }
+                    catch (Exception e) { resolve(id, false, JSONObject.quote(String.valueOf(e.getMessage()))); }
+                    return;
                 case "audioInputs": resolve(id, true, tuner.inputs().toString()); return;
                 case "setOrientation":
                     try { applyOrientation(new JSONObject(argsJson).optString("mode", "auto")); } catch (Exception ignored) {}
@@ -924,6 +938,71 @@ public class MainActivity extends Activity {
         main.post(() -> {
             ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
             cm.setPrimaryClip(ClipData.newPlainText("Cube Remote log", logForSharing()));
+        });
+    }
+
+    // ================================================================ memórias de presets
+    // Ficam num arquivo do app (memorias.json). A cada gravação o arquivo anterior vira memorias.bak.json.
+    private java.io.File memFile() { return new java.io.File(getFilesDir(), "memorias.json"); }
+
+    private synchronized String memLoad() {
+        java.io.File f = memFile();
+        if (!f.exists()) f = new java.io.File(getFilesDir(), "memorias.bak.json");
+        if (!f.exists()) return "";
+        try {
+            byte[] b = new byte[(int) f.length()];
+            try (java.io.FileInputStream in = new java.io.FileInputStream(f)) {
+                int n = 0;
+                while (n < b.length) { int r = in.read(b, n, b.length - n); if (r < 0) break; n += r; }
+            }
+            return new String(b, java.nio.charset.StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            log.log("Erro ao ler memórias: " + e);
+            return "";
+        }
+    }
+
+    private synchronized void memSave(String json) throws Exception {
+        new JSONObject(json);                                   // só grava JSON válido
+        java.io.File f = memFile(), tmp = new java.io.File(getFilesDir(), "memorias.tmp");
+        try (java.io.FileOutputStream out = new java.io.FileOutputStream(tmp)) {
+            out.write(json.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            out.getFD().sync();
+        }
+        if (f.exists()) {
+            java.io.File bak = new java.io.File(getFilesDir(), "memorias.bak.json");
+            bak.delete();
+            f.renameTo(bak);
+        }
+        if (!tmp.renameTo(f)) throw new java.io.IOException("não consegui gravar o arquivo");
+    }
+
+    /** Backup: grava o arquivo de memórias na pasta Download do celular. Devolve o nome do arquivo. */
+    private String memExport(String json) throws Exception {
+        if (Build.VERSION.SDK_INT < 29) throw new Exception("Neste Android use Enviar backup");
+        String name = "CubeRemote-memorias-" + new java.text.SimpleDateFormat("yyyy-MM-dd-HHmm", java.util.Locale.US)
+                .format(new java.util.Date()) + ".json";
+        android.content.ContentValues v = new android.content.ContentValues();
+        v.put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, name);
+        v.put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "application/json");
+        v.put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS);
+        Uri u = getContentResolver().insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, v);
+        if (u == null) throw new java.io.IOException("o Android não liberou a pasta Download");
+        try (java.io.OutputStream out = getContentResolver().openOutputStream(u)) {
+            out.write(json.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        }
+        log.log("Backup das memórias salvo em Download/" + name);
+        return name;
+    }
+
+    /** Backup pelo compartilhar do Android (WhatsApp, e-mail, Drive...). */
+    private void memShare(String json) {
+        main.post(() -> {
+            Intent i = new Intent(Intent.ACTION_SEND);
+            i.setType("text/plain");
+            i.putExtra(Intent.EXTRA_SUBJECT, "Memórias do Cube Remote");
+            i.putExtra(Intent.EXTRA_TEXT, json);
+            startActivity(Intent.createChooser(i, "Enviar backup das memórias"));
         });
     }
 
