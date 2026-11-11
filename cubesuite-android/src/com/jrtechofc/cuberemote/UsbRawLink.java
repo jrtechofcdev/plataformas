@@ -76,6 +76,11 @@ public class UsbRawLink implements CubeDevice.Link {
         while (running) {
             int n = conn.bulkTransfer(epIn, buf, buf.length, 250);
             if (n <= 0) continue;
+            if (CubeDevice.traceBytes) {
+                byte[] raw = new byte[n];
+                System.arraycopy(buf, 0, raw, 0, n);
+                CubeDevice.log(tag + " USB pacotes " + n + "B: " + CubeDevice.hex(raw, 64));
+            }
             for (int i = 0; i + 4 <= n; i += 4) {
                 int cin = buf[i] & 0x0F;
                 int len;
@@ -120,6 +125,22 @@ public class UsbRawLink implements CubeDevice.Link {
             if (r != len) throw new IOException("falha ao enviar pelo USB (" + r + ")");
         }
     }
+
+    /** Envia bytes "crus" (sem SysEx), 1 por pacote USB-MIDI (CIN 0xF) — só para testes. */
+    public void sendRaw(byte[] data) throws IOException {
+        CubeDevice.log(tag + " TX bruto " + data.length + "B " + CubeDevice.hex(data, 48));
+        byte[] pk = new byte[data.length * 4];
+        for (int i = 0; i < data.length; i++) { pk[i * 4] = (byte) ((cable << 4) | 0x0F); pk[i * 4 + 1] = data[i]; }
+        int max = Math.max(4, (epOut.getMaxPacketSize() / 4) * 4);
+        for (int off = 0; off < pk.length; off += max) {
+            int len = Math.min(max, pk.length - off);
+            byte[] part = new byte[len];
+            System.arraycopy(pk, off, part, 0, len);
+            conn.bulkTransfer(epOut, part, len, 1000);
+        }
+    }
+
+    public long receivedBytes() { return rx.received.get(); }
 
     @Override public byte[] receive(long timeoutMs) throws InterruptedException { return rx.poll(timeoutMs); }
 

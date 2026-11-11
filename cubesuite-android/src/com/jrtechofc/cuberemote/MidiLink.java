@@ -56,6 +56,14 @@ public class MidiLink implements CubeDevice.Link {
             toPedal.send(sysex, off, Math.min(512, sysex.length - off));
     }
 
+    /** Envia bytes como estão (o Android repassa como MIDI) — só para testes. */
+    public void sendRaw(byte[] data) throws IOException {
+        CubeDevice.log(tag + " TX " + data.length + "B " + CubeDevice.hex(data, 48));
+        toPedal.send(data, 0, data.length);
+    }
+
+    public long receivedBytes() { return rx.received.get(); }
+
     @Override public byte[] receive(long timeoutMs) throws InterruptedException { return rx.poll(timeoutMs); }
 
     @Override public void clear() { rx.clear(); }

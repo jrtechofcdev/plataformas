@@ -60,6 +60,16 @@ function initLog() {
   ["#btnLog", "#btnOpenLog", "#btnOpenLog2"].forEach((s) => $(s).onclick = openLog);
   $("#logClose").onclick = () => $("#logPanel").classList.add("hidden");
   $("#logDiag").onclick = () => native("diag");
+  const probe = () => {
+    if (!confirm("O teste envia 9 tipos de mensagem para a pedaleira (leva ~30 s) e registra quais têm resposta. Continuar?")) return;
+    openLog(); native("probe");
+  };
+  $("#logProbe").onclick = probe;
+  $("#btnProbe").onclick = probe;
+  $("#logMonitor").onclick = () => {
+    toast("Monitor ligado: gire os knobs e aperte os footswitches por 30 s");
+    native("monitor");
+  };
   $("#logShare").onclick = () => native("shareLog");
   $("#logCopy").onclick = () => native("copyLog").then(() => toast("Log copiado"));
   $("#logClear").onclick = () => { $("#logView").textContent = ""; native("clearLog"); };

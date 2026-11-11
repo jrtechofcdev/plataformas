@@ -23,9 +23,13 @@ Botão **📋 Log** no topo (também na tela “Conecte a Cube Baby”):
 - **🔍 Diagnóstico** lista tudo que o celular enxerga (aparelhos MIDI, USB, interfaces, endpoints, permissões);
 - **📤 Compartilhar** envia o log por WhatsApp/e-mail; **📄 Copiar** copia para a área de transferência;
 - o log também é salvo no arquivo interno `cuberemote.log` (até 1 MB).
+- **🧪 Testar protocolos** (v1.2): envia 9 variantes de identificação (formato do PC `59 00`,
+  formato do app novo do fabricante `00 59`, com/sem empacotamento 7 bits, identidade MIDI
+  universal, fluxo bruto) pelo MIDI Android e pelo USB direto, e mostra um resumo de quais responderam;
+- **🎧 Monitorar 30 s**: registra tudo que a pedaleira enviar enquanto você mexe nela.
 
 ## 📲 Instalar
-1. Copie `CubeRemote-1.1.0.apk` para o celular e abra o arquivo.
+1. Copie `CubeRemote-1.2.0.apk` para o celular e abra o arquivo.
 2. Permita “instalar apps de fontes desconhecidas” quando o Android pedir.
 3. Ligue a pedaleira no celular com **cabo USB + adaptador OTG** e abra o **Cube Remote**.
 
@@ -38,7 +42,7 @@ Precisa de Java (JDK 17+) e do Android SDK com `platforms;android-34` e `build-t
 
 ```bash
 sdkmanager "platforms;android-34" "build-tools;35.0.0"
-ANDROID_HOME=~/android-sdk ./build.sh        # gera dist/CubeRemote-1.1.0.apk
+ANDROID_HOME=~/android-sdk ./build.sh        # gera dist/CubeRemote-1.2.0.apk
 ```
 
 A assinatura usa `~/.cuberemote.jks` (criada na primeira vez). **Guarde esse arquivo:** para

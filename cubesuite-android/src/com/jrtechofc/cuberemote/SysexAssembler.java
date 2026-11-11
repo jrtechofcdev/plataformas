@@ -14,10 +14,18 @@ public class SysexAssembler {
     private final LinkedBlockingQueue<byte[]> inbox = new LinkedBlockingQueue<>();
     private boolean inSysex = false;
     private final String tag;
+    /** Total de bytes recebidos (qualquer tipo) — usado no teste de protocolos. */
+    public final java.util.concurrent.atomic.AtomicLong received = new java.util.concurrent.atomic.AtomicLong();
 
     public SysexAssembler(String tag) { this.tag = tag; }
 
     public synchronized void feed(byte[] data, int off, int len) {
+        received.addAndGet(len);
+        if (CubeDevice.traceBytes) {
+            byte[] raw = new byte[len];
+            System.arraycopy(data, off, raw, 0, len);
+            CubeDevice.log(tag + " RX bruto " + len + "B: " + CubeDevice.hex(raw, 48));
+        }
         for (int i = off; i < off + len; i++) {
             int b = data[i] & 0xFF;
             if (b >= 0xF8) continue;                       // tempo real (clock etc.): ignora

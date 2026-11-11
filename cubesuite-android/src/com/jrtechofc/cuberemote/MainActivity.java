@@ -51,7 +51,7 @@ import java.util.concurrent.TimeUnit;
  * Tudo é registrado no log (AppLog), visível no botão 📋 do app.
  */
 public class MainActivity extends Activity {
-    static final String VERSION = "1.1.0";
+    static final String VERSION = "1.2.0";
     private static final int PICK_FILE = 41;
     private static final String ACTION_USB_PERMISSION = "com.jrtechofc.cuberemote.USB_PERMISSION";
 
@@ -372,6 +372,129 @@ public class MainActivity extends Activity {
         }
     }
 
+    // ================================================================ testes (laboratório)
+    /** Abre a primeira forma de falar com a pedaleira: MIDI Android, depois USB direto. */
+    @SuppressWarnings("deprecation")
+    private List<Object> openTestLinks() {
+        List<Object> out = new ArrayList<>();
+        if (midi != null) {
+            for (MidiDeviceInfo info : midi.getDevices()) {
+                if (info.getType() != MidiDeviceInfo.TYPE_USB || info.getInputPortCount() < 1 || info.getOutputPortCount() < 1) continue;
+                MidiDevice dev = openDevice(info);
+                if (dev == null) continue;
+                try { out.add(new Object[]{new MidiLink(dev, 0, true), "MIDI Android · " + name(info)}); }
+                catch (Exception e) { log.log("  MIDI Android: " + e.getMessage()); try { dev.close(); } catch (Exception ignored) {} }
+                break;
+            }
+        }
+        return out;
+    }
+
+    private Object[] openUsbTestLink() {
+        if (usb == null) return null;
+        for (UsbDevice d : usb.getDeviceList().values()) {
+            UsbInterface[] c = UsbRawLink.candidateInterfaces(d);
+            if (c.length == 0 || !ensurePermission(d)) continue;
+            try { return new Object[]{new UsbRawLink(usb, d, c[0], 0), "USB direto · " + productName(d)}; }
+            catch (Exception e) { log.log("  USB direto: " + e.getMessage()); }
+        }
+        return null;
+    }
+
+    private static long received(Object link) {
+        return link instanceof MidiLink ? ((MidiLink) link).receivedBytes() : ((UsbRawLink) link).receivedBytes();
+    }
+
+    private static byte[] b(int... v) { byte[] r = new byte[v.length]; for (int i = 0; i < v.length; i++) r[i] = (byte) v[i]; return r; }
+
+    /** Envia várias variantes de "quem é você?" e registra quais recebem resposta. */
+    private void probe() {
+        disconnect();
+        event("status", status("search", "Testando protocolos… (veja o 📋 Log)"));
+        boolean oldTrace = CubeDevice.traceBytes;
+        CubeDevice.traceBytes = true;
+        log.log("========== TESTE DE PROTOCOLOS ==========");
+        byte[] idPc = CubeProtocol.reqIdentify();                       // 59 00 11 00 00 00 FF
+        byte[] idNew = b(0x00, 0x59, 0x11, 0, 0, 0, 0xFF);             // cabeçalho do app novo
+        byte[] fwNew = b(0x00, 0x59, 0x13, 0, 0, 0, 0xFF);             // versão do firmware (app novo)
+        Object[][] tests = {
+            {"1 PC (59 00) SysEx 7 bits", CubeProtocol.toSysex(idPc), false},
+            {"2 Novo (00 59) SysEx 7 bits", CubeProtocol.toSysex(idNew), false},
+            {"3 PC (59 00) SysEx sem empacotar", b(0xF0, 0x59, 0, 0x11, 0, 0, 0, 0xFF, 0xF7), false},
+            {"4 Novo (00 59) SysEx sem empacotar", b(0xF0, 0, 0x59, 0x11, 0, 0, 0, 0xFF, 0xF7), false},
+            {"5 Identidade MIDI universal", b(0xF0, 0x7E, 0x7F, 0x06, 0x01, 0xF7), false},
+            {"6 Handshake modo 2 do PC", b(0xF0, 0x59, 0x12, 0x00, 0x34, 0xF7), false},
+            {"7 Novo firmware (00 59 13) 7 bits", CubeProtocol.toSysex(fwNew), false},
+            {"8 Bruto 00 59 11 (estilo Bluetooth)", idNew, true},
+            {"9 Bruto 59 00 11", idPc, true},
+        };
+        StringBuilder summary = new StringBuilder();
+        List<Object[]> links = new ArrayList<>();
+        for (Object o : openTestLinks()) links.add((Object[]) o);
+        boolean usbDone = false;
+        for (int round = 0; round < 2; round++) {
+            if (round == 1) {
+                for (Object[] l : links) close(l[0]);
+                links.clear();
+                Object[] u = openUsbTestLink();
+                if (u != null) { links.add(u); usbDone = true; }
+            }
+            for (Object[] l : links) {
+                Object link = l[0];
+                log.log("---- Via " + l[1] + " ----");
+                for (Object[] t : tests) {
+                    boolean rawOnly = (Boolean) t[2];
+                    if (rawOnly && !(link instanceof UsbRawLink)) continue;
+                    long before = received(link);
+                    log.log("Teste " + t[0]);
+                    try {
+                        if (rawOnly) ((UsbRawLink) link).sendRaw((byte[]) t[1]);
+                        else if (link instanceof MidiLink) ((MidiLink) link).sendRaw((byte[]) t[1]);
+                        else ((UsbRawLink) link).send((byte[]) t[1]);
+                    } catch (Exception e) { log.log("   erro ao enviar: " + e.getMessage()); }
+                    sleep(1500);
+                    long got = received(link) - before;
+                    String r = got > 0 ? "RESPONDEU (" + got + " bytes)" : "sem resposta";
+                    log.log("   → " + r);
+                    summary.append(String.format("%-38s %-18s %s%n", t[0], l[1].toString().startsWith("USB") ? "[USB direto]" : "[MIDI Android]", r));
+                }
+            }
+        }
+        for (Object[] l : links) close(l[0]);
+        if (!usbDone) log.log("(modo USB direto não pôde ser testado)");
+        log.log("========== RESUMO ==========\n" + summary + "============================");
+        CubeDevice.traceBytes = oldTrace;
+        event("status", status("off", "Teste concluído. Abra o 📋 Log e toque em Compartilhar."));
+    }
+
+    /** Escuta tudo que a pedaleira mandar durante N segundos. */
+    private void monitor(int seconds) {
+        disconnect();
+        boolean oldTrace = CubeDevice.traceBytes;
+        CubeDevice.traceBytes = true;
+        List<Object> ls = openTestLinks();
+        Object[] l = ls.isEmpty() ? openUsbTestLink() : (Object[]) ls.get(0);
+        if (l == null) { log.log("Monitor: nenhuma porta da pedaleira abriu"); CubeDevice.traceBytes = oldTrace; return; }
+        log.log("========== MONITOR " + seconds + " s via " + l[1] + " ==========");
+        log.log("Agora: gire os knobs, aperte os 3 footswitches, segure EDIT, troque preset…");
+        event("status", status("search", "Monitorando " + seconds + " s: mexa na pedaleira agora!"));
+        long start = received(l[0]);
+        for (int i = seconds; i > 0; i--) {
+            sleep(1000);
+            if (i % 10 == 0) log.log("   … " + i + " s restantes (" + (received(l[0]) - start) + " bytes recebidos)");
+        }
+        long got = received(l[0]) - start;
+        log.log("========== FIM DO MONITOR: " + got + " bytes recebidos ==========");
+        close(l[0]);
+        CubeDevice.traceBytes = oldTrace;
+        event("status", status("off", "Monitor concluído (" + got + " bytes). Compartilhe o 📋 Log."));
+    }
+
+    private static void close(Object link) {
+        if (link instanceof MidiLink) ((MidiLink) link).close();
+        else if (link instanceof UsbRawLink) ((UsbRawLink) link).close();
+    }
+
     /** Relatório completo do que o celular enxerga (sem conectar). */
     @SuppressWarnings("deprecation")
     private void diagnostics() {
@@ -468,6 +591,8 @@ public class MainActivity extends Activity {
                 case "copyLog": copyLog(); resolve(id, true, "null"); return;
                 case "shareLog": shareLog(); resolve(id, true, "null"); return;
                 case "diag": new Thread(MainActivity.this::diagnostics).start(); resolve(id, true, "null"); return;
+                case "probe": worker.execute(MainActivity.this::probe); resolve(id, true, "null"); return;
+                case "monitor": worker.execute(() -> monitor(30)); resolve(id, true, "null"); return;
                 case "setTrace":
                     try { CubeDevice.traceBytes = new JSONObject(argsJson).getBoolean("on"); } catch (Exception ignored) {}
                     log.log("Registro de bytes (TX/RX): " + (CubeDevice.traceBytes ? "ligado" : "desligado"));
