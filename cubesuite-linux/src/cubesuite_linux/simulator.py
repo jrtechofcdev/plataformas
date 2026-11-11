@@ -16,9 +16,10 @@ from .device import FACTORY_PRESETS, FLASH_BLOCK, FLASH_SIZE
 
 
 class SimulatedCube:
-    def __init__(self, product_id: int = 0x4F06, name: str = "CubeBaby",
-                 ir_base: int = 0x60000):
+    def __init__(self, product_id: int = 0x4F06, name: str = "SINCO-CubeBaby",
+                 ir_base: int = 0x60000, magic: bytes = b"\x00\x59"):
         self.name = name
+        self.magic = magic          # a Cube Baby nova só responde a 00 59
         self.flash = bytearray(b"\xFF" * FLASH_SIZE)
         self.ram = bytearray(0x1000)
         self.presets = bytearray(FACTORY_PRESETS)
@@ -28,12 +29,22 @@ class SimulatedCube:
         self.log: list[tuple] = []
 
     # --- lado do aparelho ---------------------------------------------
-    def handle(self, pkt: bytes) -> bytes:
+    def handle(self, pkt: bytes):
+        """Resposta da pedaleira, ou None se ela ignorar (cabeçalho errado)."""
+        if pkt[:2] != self.magic:
+            return None
+        saved = P.MAGIC
+        P.set_magic(self.magic)
+        try:
+            return self._handle(pkt)
+        finally:
+            P.set_magic(saved)
+
+    def _handle(self, pkt: bytes) -> bytes:
         cmd, p = P.parse_packet(pkt)
         if cmd == P.CMD_IDENTIFY:
-            name = self.name.encode()[:8].ljust(8, b"\x00")
-            ver = bytes([2, 0, 2, 4, 0, 6, 1, 5, 0, 1, 0])     # "20240615010"
-            payload = (name + ver).ljust(27, b"\x00")
+            # resposta igual à da Cube Baby real (log do Cube Remote 1.2)
+            payload = self.name.encode().ljust(19, b" ") + bytes([1, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19])
             return P.build_packet(P.CMD_IDENTIFY, payload)
         region = p[0]
         addr = struct.unpack("<I", p[1:5])[0]
@@ -82,8 +93,9 @@ class SimulatedTransport:
 
     def send(self, msg: bytes) -> None:
         self.sent += 1
-        pkt = P.from_sysex(msg)
-        self.queue.append(P.to_sysex(self.cube.handle(pkt)))
+        reply = self.cube.handle(P.from_sysex(msg))
+        if reply is not None:
+            self.queue.append(P.to_sysex(reply))
 
     def recv_sysex(self, timeout: float):
         return self.queue.popleft() if self.queue else None

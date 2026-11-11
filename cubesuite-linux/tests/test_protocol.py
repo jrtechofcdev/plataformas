@@ -32,10 +32,19 @@ class TestPacking(unittest.TestCase):
 
     def test_known_identify(self):
         pkt = P.req_identify()
-        self.assertEqual(pkt, bytes([0x59, 0x00, 0x11, 0, 0, 0, 0xFF]))
-        # 7 bytes = 56 bits -> 8 grupos de 7 bits
-        self.assertEqual(P.to_sysex(pkt)[0], 0xF0)
-        self.assertEqual(len(P.to_sysex(pkt)), 10)
+        self.assertEqual(pkt, bytes([0x00, 0x59, 0x11, 0, 0, 0, 0xFF]))
+        # exatamente o que a Cube Baby real aceitou (log do Cube Remote 1.2)
+        self.assertEqual(P.to_sysex(pkt).hex(" ").upper(), "F0 00 32 45 00 00 00 40 7F F7")
+
+    def test_real_cube_baby_reply(self):
+        """Resposta real da pedaleira do usuário (USB 301A:5555)."""
+        msg = bytes.fromhex("F0 00 32 45 58 01 00 40 29 49 1C 0D 7A 54 65 50 3A 62 4A 09 0A 26 2C 1E"
+                            " 10 20 40 00 01 12 60 04 0A 15 2C 5C 40 11 43 07 F7")
+        name, ver = P.parse_identify(P.from_sysex(msg))
+        self.assertEqual(name, "SINCO-CubeBaby")
+        self.assertEqual(ver, "01.13.14.15.16.17.18.19")
+        ack = P.from_sysex(bytes.fromhex("F0 00 32 01 08 00 00 40 00 7E 01 F7"))
+        self.assertEqual(P.parse_ack(ack), 1)    # comando 0x13 não existe nesse modelo
 
     def test_checksum(self):
         self.assertEqual(P.checksum(b""), 0xFF)
@@ -50,7 +59,7 @@ class TestPacking(unittest.TestCase):
     def test_write_layout(self):
         pkt = P.req_write(5, 0x80000003, b"\x07")
         # 59 00 | 22 | len=9 | região 5 | addr | tam=1 | dado | chk
-        self.assertEqual(pkt[:6], bytes([0x59, 0, 0x22, 9, 0, 0]))
+        self.assertEqual(pkt[:6], bytes([0x00, 0x59, 0x22, 9, 0, 0]))
         self.assertEqual(pkt[6], 5)
         self.assertEqual(struct.unpack("<I", pkt[7:11])[0], 0x80000003)
         self.assertEqual(pkt[11:14], b"\x01\x00\x00")
@@ -66,8 +75,9 @@ class TestDeviceSimulated(unittest.TestCase):
     def test_identify_and_info(self):
         self.assertEqual(self.dev.info.model, "Cube Baby")
         self.assertEqual(self.dev.info.generation, 2)
-        self.assertEqual(self.dev.info.name, "CubeBaby")
-        self.assertEqual(self.dev.info.version, "20240615010")
+        self.assertEqual(self.dev.info.name, "SINCO-CubeBaby")
+        self.assertEqual(self.dev.info.version, "01.13.14.15.16.17.18.19")
+        self.assertTrue(self.dev.info.ir_writable)
         self.assertEqual(self.dev.info.ir_base, 0x60000)
 
     def test_presets(self):
@@ -122,6 +132,24 @@ class TestDeviceSimulated(unittest.TestCase):
         data = Path(f).read_bytes()
         self.dev.factory_ir(data)
         self.assertEqual(bytes(self.cube.flash[0x60000:0x68000]), data[0x9000:0x11000])
+
+    def test_old_header_fallback(self):
+        cube = SimulatedCube(magic=b"\x59\x00")
+        dev = D.CubeDevice(SimulatedTransport(cube))
+        dev.connect("sim")
+        self.assertEqual(P.MAGIC, b"\x59\x00")
+        self.assertEqual(dev.read_presets()[0]["volume"], 38)
+        P.set_magic(b"\x00\x59")
+
+    def test_unknown_id_blocks_ir(self):
+        cube = SimulatedCube(product_id=0x9999)
+        dev = D.CubeDevice(SimulatedTransport(cube))
+        dev.connect("sim")
+        self.assertEqual(dev.info.generation, 2)
+        self.assertFalse(dev.info.ir_writable)
+        dev.set_param(0, "gain", 3)                 # presets continuam funcionando
+        with self.assertRaises(D.DeviceError):
+            dev.ir_save(0, [0.0] * 512, 50)
 
     def test_old_generation_has_no_presets(self):
         cube = SimulatedCube(product_id=0x272E)
@@ -183,7 +211,10 @@ class TestRawMidiOverPty(unittest.TestCase):
                     start = buf.rfind(0xF0, 0, end)
                     msg = bytes(buf[start:end + 1])
                     del buf[:end + 1]
-                    reply = P.to_sysex(cube.handle(P.from_sysex(msg)))
+                    r = cube.handle(P.from_sysex(msg))
+                    if r is None:
+                        continue
+                    reply = P.to_sysex(r)
                     # envia em pedaços, com "lixo" MIDI no meio, como um aparelho real
                     os.write(master, b"\xFE" + reply[:5])
                     os.write(master, reply[5:])

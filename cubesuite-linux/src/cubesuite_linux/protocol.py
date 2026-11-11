@@ -14,7 +14,7 @@ Visão geral (do mais externo para o mais interno):
                                um fluxo de bits (bit menos significativo
                                primeiro) e cortados em pedaços de 7 bits.
   3) Pacote do aparelho:
-        59 00 | CMD | LEN (3 bytes, little-endian) | PAYLOAD (LEN bytes) | CHK
+        00 59 | CMD | LEN (3 bytes, little-endian) | PAYLOAD (LEN bytes) | CHK
         CHK = NOT(soma dos bytes do PAYLOAD) & 0xFF
 
 Comandos descobertos:
@@ -32,8 +32,16 @@ from __future__ import annotations
 
 import struct
 
-# Cabeçalho fixo de todo pacote (lido da variável global 0x756AD0 do .exe)
-MAGIC = b"\x59\x00"
+# Cabeçalho de todo pacote. A Cube Baby nova (chip Smartlink, USB 301A:5555)
+# responde a 00 59 — confirmado no aparelho real. Algumas versões podem usar
+# 59 00; o device.py testa os dois e guarda o que funcionou (set_magic).
+MAGIC = b"\x00\x59"
+VALID_MAGICS = (b"\x00\x59", b"\x59\x00")
+
+
+def set_magic(m: bytes) -> None:
+    global MAGIC
+    MAGIC = bytes(m)
 
 CMD_ACK = 0x00
 CMD_IDENTIFY = 0x11
@@ -122,7 +130,7 @@ def parse_packet(pkt: bytes) -> tuple[int, bytes]:
     """Valida um pacote recebido e devolve (cmd, payload)."""
     if len(pkt) < HEADER_LEN + 1:
         raise ProtocolError("pacote curto demais (%d bytes)" % len(pkt))
-    if pkt[:2] != MAGIC:
+    if pkt[:2] not in VALID_MAGICS:
         raise ProtocolError("cabeçalho desconhecido: %s" % pkt[:2].hex())
     cmd = pkt[2]
     n = pkt[3] | (pkt[4] << 8) | (pkt[5] << 16)
@@ -183,15 +191,26 @@ def parse_ack(pkt: bytes) -> int:
 def parse_identify(pkt: bytes) -> tuple[str, str]:
     """Devolve (nome, versão).
 
-    O original lê os bytes 0..15 do payload como nome (removendo caracteres
-    de controle) e os bytes 8..18 como dígitos da versão (+ '0').
+    Hardware novo responde ex.: "SINCO-CubeBaby     " + bytes 01 13 14 ...
+    (nome em texto e, depois, bytes de versão). O formato antigo do CubeSuite
+    para PC trazia 11 dígitos (0..9) nos bytes 8..18; os dois são aceitos.
     """
     cmd, p = parse_packet(pkt)
     if cmd != CMD_IDENTIFY:
         raise ProtocolError("esperava identificação, veio 0x%02X" % cmd)
-    name = "".join(chr(c) for c in p[:16] if c >= 0x20 and c < 0x7F)
-    ver = "".join(chr(c + 0x30) for c in p[8:19] if c < 10)
-    return name.strip(), ver
+    i = 0
+    while i < len(p) and 0x20 <= p[i] < 0x7F:
+        i += 1
+    name = p[:i].decode("ascii").strip()
+    tail = p[i:]
+    if tail and all(c < 10 for c in tail):
+        ver = "".join(chr(c + 0x30) for c in tail)
+    else:
+        ver = ".".join("%02X" % c for c in tail)
+    old = [c for c in p[8:19] if c < 10]
+    if len(p) >= 19 and len(old) == 11:
+        ver = "".join(chr(c + 0x30) for c in old)
+    return name, ver
 
 
 def parse_read(pkt: bytes) -> tuple[int, int, bytes]:

@@ -120,6 +120,11 @@ class DeviceError(Exception):
     pass
 
 
+def ir_base_ok(base: int) -> bool:
+    """Endereço dos IRs plausível: alinhado ao bloco e cabe na flash."""
+    return 0 < base and base % FLASH_BLOCK == 0 and base + FACTORY_IR_LEN <= FLASH_SIZE
+
+
 @dataclass
 class DeviceInfo:
     port: str = ""
@@ -130,6 +135,7 @@ class DeviceInfo:
     model: str = ""
     generation: int = 0
     ir_base: int = 0
+    ir_writable: bool = True
     info_addr: int = 0
     raw_info: list = field(default_factory=list)
 
@@ -139,6 +145,7 @@ class DeviceInfo:
             "version": self.version, "productId": "0x%04X" % self.product_id,
             "model": self.model, "generation": self.generation,
             "irBase": "0x%X" % self.ir_base,
+            "irWritable": self.ir_writable,
             "factoryFile": "MICRORIG.bin" if self.product_id == 0x4F09 else "BFI.bin",
         }
 
@@ -164,16 +171,26 @@ class CubeDevice:
                 raise DeviceError("a pedaleira não respondeu (timeout)")
             try:
                 pkt = P.from_sysex(msg)
-                if pkt[:2] == P.MAGIC and pkt[2] == expect_cmd:
+                if pkt[:2] in P.VALID_MAGICS and pkt[2] == expect_cmd:
                     return pkt
             except P.ProtocolError:
                 pass  # mensagem de outro tipo: ignora e continua esperando
 
     def identify(self, timeout: float = 1.0) -> tuple[str, str]:
+        """Tenta o cabeçalho 00 59 (Cube Baby nova) e depois 59 00."""
         with self.lock:
-            self.t.flush_input()
-            pkt = self._transact(P.req_identify(), P.CMD_IDENTIFY, timeout)
-            return P.parse_identify(pkt)
+            last = None
+            for magic in P.VALID_MAGICS:
+                P.set_magic(magic)
+                for _ in range(2):
+                    self.t.flush_input()
+                    try:
+                        pkt = self._transact(P.req_identify(), P.CMD_IDENTIFY, timeout)
+                        return P.parse_identify(pkt)
+                    except DeviceError as e:
+                        last = e
+            P.set_magic(P.VALID_MAGICS[0])
+            raise last
 
     def read(self, region: int, addr: int, length: int,
              progress: Progress | None = None) -> bytes:
@@ -242,6 +259,7 @@ class CubeDevice:
             else:
                 order = [0x2100, 0x180, 0x4180]
             last_err = None
+            first = None
             for addr in order:
                 try:
                     raw = self.read(FLASH_REGION, addr, 20)
@@ -249,14 +267,26 @@ class CubeDevice:
                     last_err = e
                     continue
                 vals = struct.unpack("<5I", raw)
+                first = first or (addr, vals)
                 if vals[1] in PRODUCTS:
                     info.info_addr = addr
                     info.raw_info = list(vals)
                     info.product_id = vals[1]
                     info.model, info.generation = PRODUCTS[vals[1]]
                     info.ir_base = vals[4]
+                    info.ir_writable = ir_base_ok(vals[4])
                     break
             else:
+                if "cubebaby" in name.lower():
+                    # ID não catalogado: presets liberados, flash (IR) bloqueada
+                    info.model, info.generation = "Cube Baby", 2
+                    if first:
+                        info.info_addr, vals = first
+                        info.raw_info = list(vals)
+                        info.product_id, info.ir_base = vals[1], vals[4]
+                    info.ir_writable = False
+                    self.info = info
+                    return info
                 raise DeviceError(
                     "Aparelho '%s' respondeu, mas não é uma Cube Baby "
                     "reconhecida%s" % (name, (" (%s)" % last_err) if last_err else ""))
@@ -358,6 +388,9 @@ class CubeDevice:
                 progress: Progress | None = None) -> None:
         """Salva o IR num dos 8 slots da flash — igual a 0x49E970."""
         self._require()
+        if not self.info.ir_writable:
+            raise DeviceError("Gravação de IR bloqueada: endereço dos IRs não "
+                              "confirmado neste modelo")
         if not 0 <= slot < IR_SLOTS:
             raise DeviceError("slot inválido")
         block = b"\x00\x00\x00\x00" + self._ir_payload(samples, distance)

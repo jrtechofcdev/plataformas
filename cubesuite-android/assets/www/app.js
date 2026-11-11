@@ -125,6 +125,7 @@ function applyStatus(st) {
     <dt>Nome interno</dt><dd>${esc(st.name || "—")}</dd>
     <dt>Firmware</dt><dd>${esc(st.version || "—")}</dd>
     <dt>ID</dt><dd>${esc(st.productId)}</dd>
+    <dt>Gravar IR</dt><dd>${st.irWritable === false ? "bloqueado (segurança)" : "liberado"}</dd>
     <dt>Conexão</dt><dd>${esc(st.device || "—")}</dd></dl>`;
 }
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -270,7 +271,9 @@ async function loadWav(file) {
 }
 
 function updateSaveBtn() {
-  $("#btnSaveIr").disabled = !S.ir;
+  const blocked = S.st && S.st.irWritable === false;
+  $("#btnSaveIr").disabled = !S.ir || blocked;
+  if (blocked) { $("#btnSaveIr").textContent = "🔒 Gravação de IR bloqueada neste modelo"; return; }
   $("#btnSaveIr").textContent = `💾 Salvar IR no slot ${S.slot + 1}`;
   $("#slotGrid").querySelectorAll("button").forEach((b) => b.classList.toggle("active", +b.dataset.s === S.slot));
 }

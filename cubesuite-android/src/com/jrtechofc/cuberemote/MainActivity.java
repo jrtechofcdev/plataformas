@@ -51,7 +51,7 @@ import java.util.concurrent.TimeUnit;
  * Tudo é registrado no log (AppLog), visível no botão 📋 do app.
  */
 public class MainActivity extends Activity {
-    static final String VERSION = "1.2.0";
+    static final String VERSION = "1.3.0";
     private static final int PICK_FILE = 41;
     private static final String ACTION_USB_PERMISSION = "com.jrtechofc.cuberemote.USB_PERMISSION";
 
@@ -197,8 +197,9 @@ public class MainActivity extends Activity {
         event("status", status("search", "Procurando a pedaleira…"));
         log.log("---------- Nova tentativa de conexão ----------");
 
-        if (tryMidiManager()) return;
+        // USB direto primeiro: no teste real (Samsung A16, Android 16) só ele recebeu as respostas
         if (tryUsbDirect()) return;
+        if (tryMidiManager()) return;
 
         log.log("✗ Pedaleira NÃO encontrada. Toque em 📋 → Compartilhar e envie este log.");
         event("status", status("off", "Pedaleira não encontrada.\nToque em 📋 Log para ver os detalhes e compartilhar."));
@@ -417,6 +418,7 @@ public class MainActivity extends Activity {
         byte[] idPc = CubeProtocol.reqIdentify();                       // 59 00 11 00 00 00 FF
         byte[] idNew = b(0x00, 0x59, 0x11, 0, 0, 0, 0xFF);             // cabeçalho do app novo
         byte[] fwNew = b(0x00, 0x59, 0x13, 0, 0, 0, 0xFF);             // versão do firmware (app novo)
+        CubeProtocol.setHeader(0x00, 0x59);
         Object[][] tests = {
             {"1 PC (59 00) SysEx 7 bits", CubeProtocol.toSysex(idPc), false},
             {"2 Novo (00 59) SysEx 7 bits", CubeProtocol.toSysex(idNew), false},
@@ -533,6 +535,7 @@ public class MainActivity extends Activity {
             o.put("model", c.model);
             o.put("productId", String.format("0x%04X", c.productId));
             o.put("generation", c.generation);
+            o.put("irWritable", c.irWritable);
             o.put("appVersion", VERSION);
             if (c.generation == 2) {
                 o.put("presets", presetsJson(c.readPresets()));

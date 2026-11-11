@@ -8,6 +8,9 @@ import java.io.ByteArrayOutputStream;
  *   SysEx:   F0 <bytes de 7 bits> F7
  *   Pacote:  59 00 | CMD | TAMANHO (3 bytes LE) | DADOS | CHECKSUM = NOT(soma dos DADOS)
  *
+ * CABEÇALHO: a Cube Baby (hardware novo, chip Smartlink) usa 00 59 — confirmado no
+ * aparelho real. Algumas versões antigas podem usar 59 00; por isso ele é ajustável.
+ *
  * Comandos: 0x11 identificar, 0x21 apagar, 0x22 escrever, 0x23 ler, 0x24 soma16, 0x00 ACK.
  * Classe em Java puro (sem Android) para poder ser testada no computador.
  */
@@ -20,6 +23,15 @@ public final class CubeProtocol {
     public static final int CMD_WRITE = 0x22;
     public static final int CMD_READ = 0x23;
     public static final int CMD_CHECKSUM = 0x24;
+
+    /** Cabeçalho atual dos pacotes (padrão 00 59). */
+    public static volatile byte head0 = 0x00, head1 = 0x59;
+
+    public static void setHeader(int a, int b) { head0 = (byte) a; head1 = (byte) b; }
+
+    public static boolean isHeader(byte[] p) {
+        return p.length > 2 && ((p[0] == 0x00 && p[1] == 0x59) || (p[0] == 0x59 && p[1] == 0x00));
+    }
 
     public static class ProtocolException extends Exception {
         public ProtocolException(String m) { super(m); }
@@ -82,7 +94,7 @@ public final class CubeProtocol {
     public static byte[] buildPacket(int cmd, byte[] payload) {
         int n = payload.length;
         byte[] p = new byte[6 + n + 1];
-        p[0] = 0x59; p[1] = 0x00; p[2] = (byte) cmd;
+        p[0] = head0; p[1] = head1; p[2] = (byte) cmd;
         p[3] = (byte) n; p[4] = (byte) (n >> 8); p[5] = (byte) (n >> 16);
         System.arraycopy(payload, 0, p, 6, n);
         p[6 + n] = (byte) checksum(payload, 0, n);
@@ -91,7 +103,7 @@ public final class CubeProtocol {
 
     /** Valida e devolve só o payload. */
     public static byte[] parsePacket(byte[] pkt, int expectCmd) throws ProtocolException {
-        if (pkt.length < 7 || pkt[0] != 0x59 || pkt[1] != 0x00)
+        if (pkt.length < 7 || !isHeader(pkt))
             throw new ProtocolException("pacote inválido");
         if ((pkt[2] & 0xFF) != expectCmd)
             throw new ProtocolException(String.format("comando inesperado 0x%02X", pkt[2] & 0xFF));

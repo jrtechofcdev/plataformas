@@ -11,5 +11,5 @@ for line in sys.stdin:
     if line == "DUMP":   # devolve os presets e um pedaço da RAM/flash para conferência
         print(bytes(cube.presets).hex() + " " + bytes(cube.ram[0x764:0x76C]).hex() + " " + bytes(cube.flash[0x0060000:0x0060010]).hex() + " " + bytes(cube.flash[0x3000:0x3001]).hex(), flush=True)
         continue
-    reply = P.to_sysex(cube.handle(P.from_sysex(bytes.fromhex(line))))
-    print(reply.hex(), flush=True)
+    r = cube.handle(P.from_sysex(bytes.fromhex(line)))
+    print(P.to_sysex(r).hex() if r is not None else "", flush=True)   # "" = pedaleira ignorou

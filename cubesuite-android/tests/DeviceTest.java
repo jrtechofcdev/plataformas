@@ -45,7 +45,7 @@ public class DeviceTest {
         // pacotes USB-MIDI (modo USB direto): SysEx de 10 bytes -> 4 pacotes de 4 bytes
         byte[] sx = com.jrtechofc.cuberemote.CubeProtocol.toSysex(com.jrtechofc.cuberemote.CubeProtocol.reqIdentify());
         byte[] usb = com.jrtechofc.cuberemote.UsbRawLink.encodeForTest(sx);
-        check(usb.length == 16 && usb[0] == 0x04 && usb[12] == 0x05 && (usb[13] & 0xFF) == 0xF7,
+        check(usb.length == 16 && usb[0] == 0x04 && usb[2] == 0x00 && usb[3] == 0x32 && usb[12] == 0x05 && (usb[13] & 0xFF) == 0xF7,
               "codificação USB-MIDI do SysEx: " + CubeDevice.hex(usb, 16));
         py.destroy();
         System.out.println("TODOS OS TESTES PASSARAM");

@@ -12,7 +12,13 @@ em tempo real, sem precisar se abaixar. Usa o mesmo protocolo descoberto para o 
 - USB Loopback, ler presets da pedaleira, restaurar presets de fábrica.
 - A tela **não apaga** enquanto o app está aberto (bom para palco/ensaio).
 
-## 🔌 Como o app se conecta (versão 1.1)
+## ✅ Protocolo confirmado (versão 1.3)
+O teste da v1.2 na pedaleira real (Samsung A16, Android 16, Cube Baby USB `301A:5555`) mostrou que:
+- o cabeçalho dos pacotes é **`00 59`** (não `59 00`);
+- a pedaleira se identifica como **`SINCO-CubeBaby`**;
+- no celular testado, as respostas só chegam pelo **USB direto** — por isso ele é tentado primeiro.
+
+## 🔌 Como o app se conecta
 1. **MIDI do Android** — testa todos os aparelhos MIDI e todas as portas de cada um.
 2. **USB direto** (plano B) — se o celular não listar a pedaleira como MIDI, o app fala direto com o
    USB (pacotes USB-MIDI de 4 bytes). O Android pode pedir **permissão USB**: toque em *Permitir*.
@@ -29,7 +35,7 @@ Botão **📋 Log** no topo (também na tela “Conecte a Cube Baby”):
 - **🎧 Monitorar 30 s**: registra tudo que a pedaleira enviar enquanto você mexe nela.
 
 ## 📲 Instalar
-1. Copie `CubeRemote-1.2.0.apk` para o celular e abra o arquivo.
+1. Copie `CubeRemote-1.3.0.apk` para o celular e abra o arquivo.
 2. Permita “instalar apps de fontes desconhecidas” quando o Android pedir.
 3. Ligue a pedaleira no celular com **cabo USB + adaptador OTG** e abra o **Cube Remote**.
 
@@ -42,7 +48,7 @@ Precisa de Java (JDK 17+) e do Android SDK com `platforms;android-34` e `build-t
 
 ```bash
 sdkmanager "platforms;android-34" "build-tools;35.0.0"
-ANDROID_HOME=~/android-sdk ./build.sh        # gera dist/CubeRemote-1.2.0.apk
+ANDROID_HOME=~/android-sdk ./build.sh        # gera dist/CubeRemote-1.3.0.apk
 ```
 
 A assinatura usa `~/.cuberemote.jks` (criada na primeira vez). **Guarde esse arquivo:** para

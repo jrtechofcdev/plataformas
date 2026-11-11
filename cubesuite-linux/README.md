@@ -29,7 +29,7 @@ do programa original para Windows (`CubeSuite.exe` V2.8.10) por engenharia rever
 ## 📦 Instalação (pacote .deb)
 
 ```bash
-sudo apt install ./cubesuite-linux_1.0.0_all.deb
+sudo apt install ./cubesuite-linux_1.1.0_all.deb
 ```
 
 Depois abra **CubeSuite Linux** no menu de aplicativos, ou rode `cubesuite-linux` no terminal.
@@ -80,7 +80,7 @@ Se o `.deb` foi gerado com a pasta do CubeSuite (veja abaixo), os arquivos já v
 cd cubesuite-linux
 ./packaging/build-deb.sh                       # sem arquivos de fábrica
 ./packaging/build-deb.sh ~/Downloads/CubeSuite  # incluindo BFI.bin e MICRORIG.bin
-# resultado: dist/cubesuite-linux_1.0.0_all.deb
+# resultado: dist/cubesuite-linux_1.1.0_all.deb
 ```
 
 Rodar sem instalar (para desenvolver):
@@ -125,7 +125,9 @@ cubesuite-linux/
   usando a biblioteca RtMidi (WinMM no Windows). No Linux a pedaleira aparece como um dispositivo
   ALSA comum (`/dev/snd/midiC*D*`), então **não precisa de driver**.
 * Mensagem: `F0 <dados em 7 bits> F7`. Os bytes são empacotados em fluxo de bits LSB-primeiro.
-* Pacote interno: `59 00 | CMD | TAMANHO(3) | DADOS | CHECKSUM (NOT da soma)`.
+* Pacote interno: `00 59 | CMD | TAMANHO(3) | DADOS | CHECKSUM (NOT da soma)`.
+  **Confirmado na pedaleira real** (chip Smartlink, USB `301A:5555`, responde como `SINCO-CubeBaby`).
+  O programa também tenta `59 00` automaticamente, para versões antigas.
 * Comandos: `11` identificar · `21` apagar bloco · `22` escrever · `23` ler · `24` soma16 · ACK `00`.
 * Memória:
   * Região 0 (flash 512 KB): bloco de informações em `0x2100` (ou `0x180`/`0x4180`) com o **ID do

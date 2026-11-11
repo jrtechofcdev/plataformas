@@ -71,6 +71,8 @@ public class CubeDevice {
 
     private final Link link;
     public String name = "", version = "", model = "";
+    /** false quando o ID/endereço de IR não é o esperado: bloqueia gravações na flash (IR). */
+    public boolean irWritable = true;
     public int productId, generation;
     public long irBase;
 
@@ -90,7 +92,7 @@ public class CubeDevice {
             }
             try {
                 byte[] pkt = CubeProtocol.fromSysex(msg);
-                if (pkt.length > 2 && pkt[0] == 0x59 && pkt[1] == 0 && (pkt[2] & 0xFF) == expectCmd) {
+                if (CubeProtocol.isHeader(pkt) && (pkt[2] & 0xFF) == expectCmd) {
                     byte[] payload = CubeProtocol.parsePacket(pkt, expectCmd);
                     if (traceBytes) log("← " + cmdName(expectCmd) + " ok, " + payload.length + " bytes: " + hex(payload, 24));
                     return payload;
@@ -148,18 +150,20 @@ public class CubeDevice {
     // ------------------------------------------------------------ conexão
     public synchronized void connect() throws Exception {
         link.clear();
+        firstInfo = null;
         byte[] p = null;
-        for (int attempt = 1; attempt <= 3 && p == null; attempt++) {
-            log("Identificação: tentativa " + attempt + "/3");
-            try { p = transact(CubeProtocol.reqIdentify(), CubeProtocol.CMD_IDENTIFY, 1200); }
-            catch (DeviceException e) { if (attempt == 3) throw e; }
+        // Cabeçalho 00 59 (Cube Baby nova, confirmado) e, se não responder, 59 00 (antiga)
+        int[][] heads = {{0x00, 0x59}, {0x59, 0x00}};
+        for (int h = 0; h < heads.length && p == null; h++) {
+            CubeProtocol.setHeader(heads[h][0], heads[h][1]);
+            for (int attempt = 1; attempt <= 2 && p == null; attempt++) {
+                log(String.format("Identificação (cabeçalho %02X %02X): tentativa %d/2", heads[h][0], heads[h][1], attempt));
+                try { p = transact(CubeProtocol.reqIdentify(), CubeProtocol.CMD_IDENTIFY, 1200); }
+                catch (DeviceException e) { if (h == heads.length - 1 && attempt == 2) throw e; }
+            }
         }
-        StringBuilder nm = new StringBuilder(), ver = new StringBuilder();
-        for (int i = 0; i < Math.min(16, p.length); i++) if (p[i] >= 0x20 && p[i] < 0x7F) nm.append((char) p[i]);
-        for (int i = 8; i < Math.min(19, p.length); i++) if (p[i] >= 0 && p[i] < 10) ver.append((char) (p[i] + '0'));
-        name = nm.toString().trim();
-        version = ver.toString();
-        log("Aparelho respondeu: nome='" + name + "' versão='" + version + "'");
+        parseIdentity(p);
+        log("Aparelho respondeu: nome='" + name + "' versão='" + version + "' · " + hex(p, 32));
 
         long[] order = name.contains("looperpro1") ? new long[]{0x4180, 0x2100, 0x180}
                 : name.contains("Cuvave-IR") ? new long[]{0x180, 0x2100, 0x4180}
@@ -177,10 +181,53 @@ public class CubeDevice {
                 generation = gen;
                 model = modelOf(pid);
                 irBase = CubeProtocol.getU32(info, 16);
+                irWritable = irBaseOk(irBase);
+                log(String.format("Endereço dos IRs: 0x%X (%s)", irBase, irWritable ? "ok" : "suspeito: gravação de IR bloqueada"));
                 return;
             }
+            if (firstInfo == null) { firstInfo = info; firstAddr = addr; }
+        }
+        // ID desconhecido, mas o nome diz que é uma Cube Baby: libera os presets e bloqueia a flash (IR)
+        if (name.toLowerCase(java.util.Locale.ROOT).contains("cubebaby")) {
+            generation = 2;
+            model = "Cube Baby";
+            productId = firstInfo != null ? (int) CubeProtocol.getU32(firstInfo, 4) : 0;
+            irBase = firstInfo != null ? CubeProtocol.getU32(firstInfo, 16) : 0;
+            irWritable = false;
+            log(String.format("Cube Baby com ID não catalogado (0x%04X, info em 0x%X): presets liberados, gravação de IR bloqueada por segurança",
+                    productId, firstAddr));
+            return;
         }
         throw new DeviceException("'" + name + "' respondeu, mas não é uma Cube Baby reconhecida");
+    }
+
+    private byte[] firstInfo = null;
+    private long firstAddr = 0;
+
+    static boolean irBaseOk(long base) {
+        return base > 0 && base % BLOCK == 0 && base + 0x8000 <= FLASH_SIZE;
+    }
+
+    /** Nome = letras do início; versão = bytes que vêm depois (formato muda entre modelos). */
+    void parseIdentity(byte[] p) {
+        StringBuilder nm = new StringBuilder();
+        int i = 0;
+        while (i < p.length && p[i] >= 0x20 && p[i] < 0x7F) nm.append((char) p[i++]);
+        name = nm.toString().trim();
+        StringBuilder ver = new StringBuilder();
+        boolean digits = true;
+        for (int k = i; k < p.length; k++) if (p[k] < 0 || p[k] > 9) digits = false;
+        for (int k = i; k < p.length; k++) {
+            if (digits) ver.append((char) ('0' + p[k]));
+            else ver.append(ver.length() > 0 ? "." : "").append(String.format("%02X", p[k] & 0xFF));
+        }
+        version = ver.toString();
+        // formato antigo (CubeSuite PC): versão em dígitos 0..9 nos bytes 8..18
+        if (name.length() > 8 && p.length >= 19) {
+            StringBuilder old = new StringBuilder();
+            for (int k = 8; k < 19; k++) if (p[k] >= 0 && p[k] < 10) old.append((char) ('0' + p[k]));
+            if (old.length() == 11) version = old.toString();
+        }
     }
 
     /** 2 = geração nova (presets), 1 = antiga (só IR), 0 = outro modelo, -1 = desconhecido. */
@@ -270,6 +317,7 @@ public class CubeDevice {
         byte[] payload = irPayload(samples, distance);
         byte[] block = new byte[4 + payload.length];             // 4 bytes de flag (0) + dados
         System.arraycopy(payload, 0, block, 4, payload.length);
+        if (!irWritable) throw new DeviceException("Gravação de IR bloqueada: endereço de memória dos IRs não confirmado neste modelo");
         long addr = irBase + (long) slot * BLOCK;
         if (addr + block.length > FLASH_SIZE) throw new DeviceException("sem espaço na memória");
         for (long a = addr; a < addr + block.length; a += BLOCK) erase(a);
