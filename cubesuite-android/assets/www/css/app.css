@@ -599,6 +599,42 @@ button { font: inherit; color: inherit; }
   .live-btn { min-height: 84px; }
 }
 
+/* Memórias: abas internas e Biblioteca */
+.mem-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 5px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line);
+  position: sticky; top: 0; z-index: 3; }
+.mem-tabs button { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 52px; border: 0; border-radius: 12px; cursor: pointer;
+  background: transparent; color: var(--text-2); font: 700 17px var(--font-label); letter-spacing: .3px; }
+.mem-tabs button .ico { width: 22px; height: 22px; }
+.mem-tabs button small { font-size: 13px; color: inherit; opacity: .8; margin-left: 2px; }
+.mem-tabs button[aria-selected="true"] { background: var(--brand); color: var(--brand-ink); }
+.lib-empty { max-width: none; }
+.lib-empty .file-btn { width: 100%; }
+.lib-cats { position: static; padding-top: 0; }
+.lib-cats .chip-btn { min-height: 44px; }
+.lib-cats .chip-btn small { color: var(--muted); margin-left: 4px; }
+.lib-cats .chip-btn[aria-pressed="true"] { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); }
+.lib-cats .chip-btn[aria-pressed="true"] small { color: var(--brand-ink); }
+.lib-status button { min-height: 44px; font-size: 14px; }
+.lib-count { color: var(--muted); font-size: 13px; }
+.lib-list { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr)); }
+.lib-card { display: grid; gap: 10px; padding: 12px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--line); }
+.lib-card.ok { border-color: color-mix(in srgb, var(--led-green) 55%, var(--line)); }
+.lib-card.no { opacity: .7; border-style: dashed; }
+.lib-top { display: flex; align-items: flex-start; gap: 8px; }
+.lib-info { flex: 1; min-width: 0; display: grid; gap: 4px; }
+.lib-info h3 { font-size: 21px; overflow-wrap: anywhere; }
+.lib-info p { color: var(--text-2); font-size: 14px; line-height: 1.3; }
+.lib-by { color: var(--muted) !important; font-size: 13px !important; }
+.lib-desc { color: var(--text) !important; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.lib-knobs { font: 600 13px/1.35 var(--font-label) !important; letter-spacing: .2px; color: var(--text-2) !important; }
+.lib-st { margin-left: 6px; font: 700 12px var(--font-label); border-radius: 6px; padding: 1px 6px; }
+.lib-st.ok { color: #04130a; background: var(--led-green); }
+.lib-st.no { color: var(--muted); border: 1px solid var(--line-strong); }
+.lib-mod { min-height: 44px; justify-content: flex-start; text-align: left; font-size: 14px; color: var(--warn); border-color: rgba(242, 193, 78, .45); background: transparent; }
+.lib-mod span { white-space: normal; line-height: 1.2; }
+.lib-actions { display: grid; grid-template-columns: 1.4fr 1fr; gap: 8px; }
+.lib-actions .btn { min-height: 52px; padding: 0 8px; }
+
 /* Memórias */
 .mem-page { gap: 12px; }
 .mem-head p { color: var(--text-2); margin-top: 2px; }

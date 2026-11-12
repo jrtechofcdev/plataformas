@@ -85,6 +85,8 @@ CR.App = (function () {
     initLock();
     CR.Stage.render();
     CR.Memory.init();
+    CR.Library.init();
+    CR.on("library", function () { CR.Stage.refresh(); CR.Memory.refresh(); });
     CR.Culto.init();
     CR.Stage.showState(CR.S.status);
     CR.on("status", applyStatus);

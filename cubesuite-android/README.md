@@ -4,7 +4,7 @@ App Android para controlar a pedaleira **Cube Baby** pelo cabo USB (OTG), em tem
 em pé ou deitado. Criado do zero por José Renato (Jr_Tech_OFC).
 © 2026 José Renato · Jr_Tech_OFC. Todos os direitos reservados (veja `LICENSE`).
 
-## Funções (versão 2.4)
+## Funções (versão 2.5)
 Feito para mexer rápido e com precisão durante o culto, com botões grandes.
 - **Palco** (tela principal, nunca rola):
   - **Presets A, B, C** em botões grandes (LED verde, azul, vermelho, como na pedaleira).
@@ -34,7 +34,7 @@ Feito para mexer rápido e com precisão durante o culto, com botões grandes.
     Boost/Mudo, ou Swell/Fade. Opcional: os botões de volume do celular (e controles de selfie
     Bluetooth) funcionam como pedal. Funciona com a trava de palco ligada.
   - A setlist vai junto no backup das memórias. Arquivo do app: `setlist.json`.
-- **Memórias** (10 sons guardados no celular):
+- **Memórias** (10 sons guardados no celular, e **Criar memória** para ter até 60):
   - Cada memória tem botões grandes **A, B, C**: um toque carrega o som naquele footswitch
     (grava na pedaleira e confere). O botão fica marcado "atual" quando o preset já tem esse som.
   - Memória vazia: toque em A, B ou C para guardar o som atual daquele preset, com um nome.
@@ -45,6 +45,12 @@ Feito para mexer rápido e com precisão durante o culto, com botões grandes.
     com um toque e aparecem na setlist. Para criar ou mudar um som, edite `js/sounds.js`.
   - Carregou errado? O **Desfazer** do topo volta o preset inteiro ao som anterior.
   - Os botões A, B, C do Palco mostram o nome da memória carregada em cada um.
+  - **Biblioteca** (aba dentro de Memórias): sobe presets **em lote** (.zip com vários .json, ou vários
+    .json de uma vez), separa por **categoria** (Worship e igreja, Limpo, Crunch e overdrive, Distorção e
+    peso, Solo, Ambiente e efeitos, Violão), busca, situação (Para testar, Aprovados, Descartados).
+    Cada preset: **Testar em A, B ou C**, **Aprovar e guardar** numa memória nova ou existente,
+    Descartar, mudar a categoria. Presets com MOD 0 (chorus no máximo) têm o botão "Tirar o chorus".
+    Formato do arquivo: veja o topo de `js/library.js`. Ignora presets de Cube Baby Bass e AC.
   - Backup: salvar na pasta Download, enviar (WhatsApp, e-mail, Drive) e importar
     (arquivo ou texto colado). Arquivo do app: `memorias.json`, com cópia automática `memorias.bak.json`.
 - **Afinador** em aba própria: nota gigante, ponteiro ou **estroboscópio** (mostra menos de 1 cent),
@@ -68,7 +74,7 @@ Feito para mexer rápido e com precisão durante o culto, com botões grandes.
 - Desfazer e **trava de palco** (segurar o cadeado 1 s para destravar) no topo.
 
 ## Instalar
-1. Copie `CubeRemote-2.4.1.apk` para o celular e abra (permita "fontes desconhecidas").
+1. Copie `CubeRemote-2.5.0.apk` para o celular e abra (permita "fontes desconhecidas").
    Instala por cima das versões anteriores (mesma chave de assinatura).
 2. Ligue a pedaleira com cabo USB + adaptador OTG. O app conecta sozinho.
 3. Na primeira vez que abrir o afinador, permita o uso do microfone.
@@ -84,7 +90,7 @@ IR CAB e os módulos 1, 2 e 3 nos bytes 10, 11 e 12.
 ## Gerar o APK (sem Android Studio)
 ```bash
 sdkmanager "platforms;android-34" "build-tools;35.0.0"
-ANDROID_HOME=~/android-sdk ./build.sh        # gera dist/CubeRemote-2.4.1.apk
+ANDROID_HOME=~/android-sdk ./build.sh        # gera dist/CubeRemote-2.5.0.apk
 ```
 A assinatura usa `~/.cuberemote.jks`. Guarde esse arquivo: sem ele, uma versão nova não instala por cima.
 
@@ -102,6 +108,7 @@ cubesuite-android/
 │   ├── js/stage.js           tela Palco e tela de ajuste
 │   ├── js/memory.js          aba Memórias (10 sons, fábrica e backup)
 │   ├── js/sounds.js          sons prontos para o culto (edite aqui)
+│   ├── js/library.js         Biblioteca: importação em lote (.zip/.json) e categorias
 │   ├── js/setlist.js         aba Culto (setlist e pedal Bluetooth)
 │   ├── js/live.js            Boost, Mudo, Swell e Fade out
 │   ├── js/irlab.js           editor de IR

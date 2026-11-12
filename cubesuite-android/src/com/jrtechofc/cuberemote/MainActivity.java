@@ -59,7 +59,7 @@ import java.util.concurrent.TimeUnit;
  * Tudo é registrado no log (AppLog), visível em Ajustes > Log.
  */
 public class MainActivity extends Activity {
-    static final String VERSION = "2.4.1";
+    static final String VERSION = "2.5.0";
     private static final int PICK_FILE = 41;
     private static final String ACTION_USB_PERMISSION = "com.jrtechofc.cuberemote.USB_PERMISSION";
 
@@ -1062,7 +1062,7 @@ public class MainActivity extends Activity {
     private static String storeName(String argsJson) {
         try {
             String n = new JSONObject(argsJson).optString("name");
-            return "setlist".equals(n) || "irbak".equals(n) ? n : "memorias";
+            return "setlist".equals(n) || "irbak".equals(n) || "biblioteca".equals(n) ? n : "memorias";
         }
         catch (Exception e) { return "memorias"; }
     }

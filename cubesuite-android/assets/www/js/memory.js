@@ -9,7 +9,8 @@
 var CR = window.CR || (window.CR = {});
 
 CR.Memory = (function () {
-  var N = 10;                          // quantidade de memórias (mude aqui se quiser mais)
+  var N = 10;                          // memórias que sempre aparecem (mínimo)
+  var N_MAX = 60;                      // máximo de memórias (o botão "Criar memória" vai até aqui)
   var NAME_MAX = 28;
   var LETTERS = ["A", "B", "C"];
   var FACTORY_DEFAULT = [[2, 4, 10, 4, 31, 38, 31, 19, 7, 8, 1, 1, 1, 0, 0, 0],
@@ -50,7 +51,8 @@ CR.Memory = (function () {
     var o = JSON.parse(text.slice(a, b + 1));
     if (!o || o.kind !== "memorias" || !Array.isArray(o.slots)) throw new Error("O arquivo não é um backup de memórias do Cube Remote.");
     var d = emptyData();
-    for (var i = 0; i < N; i++) {
+    var n = Math.max(N, Math.min(N_MAX, o.slots.length));
+    for (var i = 0; i < n; i++) {
       d.slots[i] = cleanSlot(o.slots[i]);
       if (d.slots[i] && (!o.slots[i].id || o.slots[i].id !== d.slots[i].id)) d._newIds = true;
     }
@@ -72,6 +74,8 @@ CR.Memory = (function () {
   }
 
   function persist() {
+    // tira os espaços vazios do fim (acima do mínimo), para a lista não crescer à toa
+    while (data.slots.length > N && data.slots[data.slots.length - 1] === null) data.slots.pop();
     CR.emit("memories");
     return CR.native("memSave", { data: JSON.stringify(data, null, 1) })
       .catch(function (e) { CR.toast(e.message, true); throw e; });
@@ -145,14 +149,30 @@ CR.Memory = (function () {
       loadButtons(v, "ready", i, "Carregar em") + "</article>";
   }
   function keepReady(i) {
-    var s = CR.SOUNDS[i], free = data.slots.indexOf(null);
-    if (free < 0) { CR.toast("As 10 memórias estão em uso. Apague uma para guardar este som.", true); return; }
-    data.slots[free] = { id: newId(), name: s.name.slice(0, NAME_MAX), values: readyValues(i), from: "", saved: today() };
-    persist().then(function () { CR.toast('"' + s.name + '" guardado na memória ' + (free + 1) + ". Agora dá para ajustar e substituir à vontade."); refresh(); });
+    saveValues(readyValues(i), CR.SOUNDS[i].name, refresh);
+  }
+
+  /* Abas internas: Minhas memórias | Biblioteca (presets importados em lote, aba Biblioteca) */
+  function tabsHtml(active) {
+    var nLib = CR.Library ? CR.Library.count() : 0;
+    return '<div class="mem-tabs" role="tablist">' +
+      '<button type="button" role="tab" data-memtab="mine" aria-selected="' + (active === "mine") + '">' + CR.icon("memory") + "<span>Minhas memórias</span></button>" +
+      '<button type="button" role="tab" data-memtab="lib" aria-selected="' + (active === "lib") + '">' + CR.icon("learn") + "<span>Biblioteca" + (nLib ? " <small>" + nLib + "</small>" : "") + "</span></button></div>";
+  }
+  function bindTabs(view) {
+    view.querySelectorAll("[data-memtab]").forEach(function (b) {
+      b.onclick = function () { CR.prefs.memTab = b.dataset.memtab; CR.savePrefs(); view.scrollTop = 0; render(); };
+    });
   }
 
   function render() {
     var view = document.getElementById("view-memory");
+    if (CR.prefs.memTab === "lib" && CR.Library) {
+      if (!loaded) { load().then(render); return; }
+      CR.Library.render(view, tabsHtml("lib"));
+      bindTabs(view);
+      return;
+    }
     if (!loaded) {
       view.innerHTML = '<div class="page"><div class="state-card"><div class="spinner"></div><h2>Abrindo memórias</h2></div></div>';
       load().then(render);
@@ -161,10 +181,12 @@ CR.Memory = (function () {
     var used = data.slots.filter(Boolean).length;
     var offline = !CR.S.presets;
     view.innerHTML = '<div class="page mem-page">' +
-      '<header class="mem-head"><h1 class="page-title">Memórias</h1><p>' + used + " de " + N + " em uso. Toque em A, B ou C para carregar o som no footswitch.</p></header>" +
+      tabsHtml("mine") +
+      '<header class="mem-head"><p>' + used + " de " + data.slots.length + " em uso (até " + N_MAX + "). Toque em A, B ou C para carregar o som no footswitch.</p></header>" +
       (loadError ? '<p class="mem-warn">' + CR.esc(loadError) + "</p>" : "") +
       (offline ? '<p class="mem-warn">Conecte a pedaleira para carregar ou guardar sons. Dá para renomear, organizar e fazer backup mesmo sem ela.</p>' : "") +
       '<div class="mem-list">' + data.slots.map(card).join("") + "</div>" +
+      '<button class="btn wide big" type="button" data-addslot' + (data.slots.length >= N_MAX ? " disabled" : "") + ">" + CR.icon("plus") + "<span>Criar memória</span></button>" +
       '<h2 class="mem-sec">Presets de fábrica</h2><p class="mem-sub">Sempre disponíveis. Não podem ser apagados nem alterados.</p>' +
       '<div class="mem-list">' + factory().map(factoryCard).join("") + "</div>" +
       '<h2 class="mem-sec">Sons prontos para o culto</h2><p class="mem-sub">' + CR.SOUNDS.length + " sons de ponto de partida, by Jr_Tech_OFC. Carregue em A, B ou C, ou toque na seta de guardar para copiar numa memória sua e ajustar. Nivele os volumes no ensaio.</p>" +
@@ -190,6 +212,16 @@ CR.Memory = (function () {
       b.onclick = function () { saveDialog(Number(b.dataset.save), Number(b.dataset.to)); };
     });
     view.querySelectorAll("[data-more]").forEach(function (b) { b.onclick = function () { menu(Number(b.dataset.more)); }; });
+    bindTabs(view);
+    var add = view.querySelector("[data-addslot]");
+    if (add) add.onclick = function () {
+      if (data.slots.length >= N_MAX) return;
+      data.slots.push(null);
+      CR.haptic();
+      render();
+      view.scrollTop = add.offsetTop - 200;
+      CR.toast("Memória " + data.slots.length + " criada. Toque em A, B ou C nela para guardar o som de um preset.");
+    };
     view.querySelectorAll("[data-backup]").forEach(function (b) {
       b.onclick = function () { ({ export: exportFile, share: share, import: importDialog })[b.dataset.backup](); };
     });
@@ -266,7 +298,7 @@ CR.Memory = (function () {
         '<button class="btn big" type="button" data-m="rename">' + CR.icon("edit") + "<span>Renomear</span></button>" +
         '<button class="btn big danger" type="button" data-m="delete">' + CR.icon("trash") + "<span>Apagar</span></button>" +
         '<button class="btn big" type="button" data-m="up"' + (i === 0 ? " disabled" : "") + ">" + CR.icon("up") + "<span>Subir</span></button>" +
-        '<button class="btn big" type="button" data-m="down"' + (i === N - 1 ? " disabled" : "") + ">" + CR.icon("down") + "<span>Descer</span></button>" +
+        '<button class="btn big" type="button" data-m="down"' + (i === data.slots.length - 1 ? " disabled" : "") + ">" + CR.icon("down") + "<span>Descer</span></button>" +
       "</div>");
     var d = document.getElementById("dialog");
     d.querySelectorAll("[data-replace]").forEach(function (b) {
@@ -362,15 +394,42 @@ CR.Memory = (function () {
 
   /* Nome da memória cujo som é igual ao preset p agora (para os botões A, B, C do Palco). */
   function nameFor(p) {
-    for (var i = 0; i < N; i++) { var sl = data.slots[i]; if (sl && sameAs(sl.values, p)) return sl.name; }
+    for (var i = 0; i < data.slots.length; i++) { var sl = data.slots[i]; if (sl && sameAs(sl.values, p)) return sl.name; }
     var f = factory();
     for (var j = 0; j < 3; j++) if (sameAs(f[j], p)) return "Fábrica " + LETTERS[j];
     for (var k = 0; k < CR.SOUNDS.length; k++) if (sameAs(readyValues(k), p)) return CR.SOUNDS[k].name;
+    if (CR.Library) return CR.Library.nameFor(p);
     return "";
   }
 
   /* Abre o arquivo de memórias ao iniciar o app, para o Palco já mostrar os nomes. */
   function init() { return load().then(function () { CR.emit("memories"); }); }
+
+  /* Guarda um som vindo de fora (Biblioteca) numa memória: nova ou substituindo uma existente. */
+  function saveValues(values, name, cb) {
+    var v = cleanSlot({ values: values }).values;
+    var opts = "";
+    if (data.slots.length < N_MAX || data.slots.indexOf(null) >= 0) opts += '<option value="new">Nova memória</option>';
+    data.slots.forEach(function (sl, i) {
+      opts += '<option value="' + i + '">' + (i + 1) + ". " + (sl ? CR.esc(sl.name) + " (substituir)" : "Vazia") + "</option>";
+    });
+    CR.dialog("green", "Guardar nas memórias", "Escolha onde guardar",
+      nameField(name, "Nome da memória") +
+      '<label class="field"><span class="field-head"><span>Onde guardar</span></span><select class="text-input" id="memTarget">' + opts + "</select></label>" +
+      '<div class="dialog-actions"><button class="btn big" type="button" data-no>Cancelar</button>' +
+      '<button class="btn primary big" type="button" data-yes>' + CR.icon("save") + "<span>Guardar</span></button></div>");
+    var d = document.getElementById("dialog");
+    d.querySelector("[data-no]").onclick = function () { d.hidden = true; };
+    d.querySelector("[data-yes]").onclick = function () {
+      var t = d.querySelector("#memTarget").value, i;
+      if (t === "new") { i = data.slots.indexOf(null); if (i < 0) { data.slots.push(null); i = data.slots.length - 1; } }
+      else i = Number(t);
+      var nm = d.querySelector("#memName").value.trim().slice(0, NAME_MAX) || name.slice(0, NAME_MAX) || "Memória " + (i + 1);
+      data.slots[i] = { id: data.slots[i] ? data.slots[i].id : newId(), name: nm, values: v, from: "", saved: today() };
+      d.hidden = true;
+      persist().then(function () { CR.haptic(); CR.toast('"' + nm + '" guardado na memória ' + (i + 1)); if (cb) cb(i); });
+    };
+  }
 
   /* Para a setlist: lista de sons que podem ir num footswitch ("f0" a "f2" = fábrica A a C). */
   function options() {
@@ -384,10 +443,11 @@ CR.Memory = (function () {
     if (!ref) return null;
     if (/^f[0-2]$/.test(ref)) { var p = Number(ref[1]); return { name: "Fábrica " + LETTERS[p], values: factory()[p] }; }
     if (/^r\d+$/.test(ref) && CR.SOUNDS[Number(ref.slice(1))]) { var r = Number(ref.slice(1)); return { name: CR.SOUNDS[r].name, values: readyValues(r) }; }
-    for (var i = 0; i < N; i++) if (data.slots[i] && data.slots[i].id === ref) return data.slots[i];
+    for (var i = 0; i < data.slots.length; i++) if (data.slots[i] && data.slots[i].id === ref) return data.slots[i];
     return null;
   }
 
-  return { render: render, refresh: refresh, nameFor: nameFor, init: init, options: options, byRef: byRef,
+  return { render: render, refresh: refresh, nameFor: nameFor, init: init, options: options, byRef: byRef, saveValues: saveValues,
+           clean: function (v) { return cleanSlot({ values: v }); }, sameAs: sameAs, summary: summary, mods: mods, loadButtons: loadButtons, applyTo: applyTo,
            ready: function () { return loaded; }, _parse: parse };
 })();
