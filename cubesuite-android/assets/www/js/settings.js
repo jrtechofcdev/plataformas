@@ -5,7 +5,7 @@ var CR = window.CR || (window.CR = {});
 
 CR.Settings = (function () {
   var $ = function (s, root) { return (root || document).querySelector(s); };
-  var appInfo = { version: "2.4.0" };
+  var appInfo = { version: "2.4.1" };
 
   function seg(name, options, current) {
     return '<div class="seg" role="group" data-seg="' + name + '">' + options.map(function (o) {

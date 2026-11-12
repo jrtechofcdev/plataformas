@@ -134,6 +134,23 @@ CR.Memory = (function () {
       loadButtons(v, "factory", p, "Carregar em") + "</article>";
   }
 
+  /* Sons prontos (js/sounds.js): só leitura, carregam em A/B/C ou viram uma memória sua. */
+  function readyValues(i) { return cleanSlot({ values: CR.SOUNDS[i].values }).values; }
+  function readyCard(s, i) {
+    var v = readyValues(i);
+    return '<article class="mem-card ready"><div class="mem-top"><span class="mem-n r">' + CR.icon("culto") + "</span>" +
+      '<div class="mem-info"><p class="mem-group">' + CR.esc(s.group) + "</p><h3>" + CR.esc(s.name) + '</h3><p class="mem-desc">' + CR.esc(s.desc) + "</p>" +
+      "<p>" + CR.esc(summary(v)) + "</p>" + mods(v) + "</div>" +
+      '<button type="button" class="icon-btn mem-more" data-keep="' + i + '" aria-label="Guardar ' + CR.esc(s.name) + ' numa memória">' + CR.icon("save") + "</button></div>" +
+      loadButtons(v, "ready", i, "Carregar em") + "</article>";
+  }
+  function keepReady(i) {
+    var s = CR.SOUNDS[i], free = data.slots.indexOf(null);
+    if (free < 0) { CR.toast("As 10 memórias estão em uso. Apague uma para guardar este som.", true); return; }
+    data.slots[free] = { id: newId(), name: s.name.slice(0, NAME_MAX), values: readyValues(i), from: "", saved: today() };
+    persist().then(function () { CR.toast('"' + s.name + '" guardado na memória ' + (free + 1) + ". Agora dá para ajustar e substituir à vontade."); refresh(); });
+  }
+
   function render() {
     var view = document.getElementById("view-memory");
     if (!loaded) {
@@ -150,6 +167,8 @@ CR.Memory = (function () {
       '<div class="mem-list">' + data.slots.map(card).join("") + "</div>" +
       '<h2 class="mem-sec">Presets de fábrica</h2><p class="mem-sub">Sempre disponíveis. Não podem ser apagados nem alterados.</p>' +
       '<div class="mem-list">' + factory().map(factoryCard).join("") + "</div>" +
+      '<h2 class="mem-sec">Sons prontos para o culto</h2><p class="mem-sub">' + CR.SOUNDS.length + " sons de ponto de partida, by Jr_Tech_OFC. Carregue em A, B ou C, ou toque na seta de guardar para copiar numa memória sua e ajustar. Nivele os volumes no ensaio.</p>" +
+      '<div class="mem-list">' + CR.SOUNDS.map(readyCard).join("") + "</div>" +
       '<article class="card"><header class="card-head">' + CR.icon("save") + "<div><h2>Backup</h2><p>Guarde uma cópia das memórias para não perder ao trocar de celular.</p></div></header>" +
         '<div class="mem-backup">' +
         '<button class="btn" type="button" data-backup="export">' + CR.icon("save") + "<span>Salvar em Download</span></button>" +
@@ -163,6 +182,10 @@ CR.Memory = (function () {
     view.querySelectorAll("[data-factory]").forEach(function (b) {
       b.onclick = function () { var p = Number(b.dataset.factory); applyTo(factory()[p], Number(b.dataset.to), "Fábrica " + LETTERS[p]); };
     });
+    view.querySelectorAll("[data-ready]").forEach(function (b) {
+      b.onclick = function () { var i = Number(b.dataset.ready); applyTo(readyValues(i), Number(b.dataset.to), '"' + CR.SOUNDS[i].name + '"'); };
+    });
+    view.querySelectorAll("[data-keep]").forEach(function (b) { b.onclick = function () { keepReady(Number(b.dataset.keep)); }; });
     view.querySelectorAll("[data-save]").forEach(function (b) {
       b.onclick = function () { saveDialog(Number(b.dataset.save), Number(b.dataset.to)); };
     });
@@ -342,6 +365,7 @@ CR.Memory = (function () {
     for (var i = 0; i < N; i++) { var sl = data.slots[i]; if (sl && sameAs(sl.values, p)) return sl.name; }
     var f = factory();
     for (var j = 0; j < 3; j++) if (sameAs(f[j], p)) return "Fábrica " + LETTERS[j];
+    for (var k = 0; k < CR.SOUNDS.length; k++) if (sameAs(readyValues(k), p)) return CR.SOUNDS[k].name;
     return "";
   }
 
@@ -353,11 +377,13 @@ CR.Memory = (function () {
     var out = [];
     data.slots.forEach(function (sl, i) { if (sl) out.push({ ref: sl.id, name: (i + 1) + ". " + sl.name }); });
     LETTERS.forEach(function (L, p) { out.push({ ref: "f" + p, name: "Fábrica " + L }); });
+    CR.SOUNDS.forEach(function (s, i) { out.push({ ref: "r" + i, name: "Pronto: " + s.name }); });
     return out;
   }
   function byRef(ref) {
     if (!ref) return null;
     if (/^f[0-2]$/.test(ref)) { var p = Number(ref[1]); return { name: "Fábrica " + LETTERS[p], values: factory()[p] }; }
+    if (/^r\d+$/.test(ref) && CR.SOUNDS[Number(ref.slice(1))]) { var r = Number(ref.slice(1)); return { name: CR.SOUNDS[r].name, values: readyValues(r) }; }
     for (var i = 0; i < N; i++) if (data.slots[i] && data.slots[i].id === ref) return data.slots[i];
     return null;
   }

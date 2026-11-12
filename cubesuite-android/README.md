@@ -40,6 +40,9 @@ Feito para mexer rápido e com precisão durante o culto, com botões grandes.
   - Memória vazia: toque em A, B ou C para guardar o som atual daquele preset, com um nome.
   - Menu de cada memória: ver todos os valores, substituir, renomear, apagar, subir e descer.
   - **Presets de fábrica** sempre disponíveis como 3 memórias fixas, que não se apagam.
+  - **Sons prontos para o culto** (js/sounds.js): Fundo Ambiente, Fundo Brilhante, Base Limpa,
+    Base Crunch, Hinos da Harpa, Solo Cantado e Solo Distorção. Carregam em A/B/C, viram memória
+    com um toque e aparecem na setlist. Para criar ou mudar um som, edite `js/sounds.js`.
   - Carregou errado? O **Desfazer** do topo volta o preset inteiro ao som anterior.
   - Os botões A, B, C do Palco mostram o nome da memória carregada em cada um.
   - Backup: salvar na pasta Download, enviar (WhatsApp, e-mail, Drive) e importar
@@ -65,7 +68,7 @@ Feito para mexer rápido e com precisão durante o culto, com botões grandes.
 - Desfazer e **trava de palco** (segurar o cadeado 1 s para destravar) no topo.
 
 ## Instalar
-1. Copie `CubeRemote-2.4.0.apk` para o celular e abra (permita "fontes desconhecidas").
+1. Copie `CubeRemote-2.4.1.apk` para o celular e abra (permita "fontes desconhecidas").
    Instala por cima das versões anteriores (mesma chave de assinatura).
 2. Ligue a pedaleira com cabo USB + adaptador OTG. O app conecta sozinho.
 3. Na primeira vez que abrir o afinador, permita o uso do microfone.
@@ -81,7 +84,7 @@ IR CAB e os módulos 1, 2 e 3 nos bytes 10, 11 e 12.
 ## Gerar o APK (sem Android Studio)
 ```bash
 sdkmanager "platforms;android-34" "build-tools;35.0.0"
-ANDROID_HOME=~/android-sdk ./build.sh        # gera dist/CubeRemote-2.4.0.apk
+ANDROID_HOME=~/android-sdk ./build.sh        # gera dist/CubeRemote-2.4.1.apk
 ```
 A assinatura usa `~/.cuberemote.jks`. Guarde esse arquivo: sem ele, uma versão nova não instala por cima.
 
@@ -98,6 +101,7 @@ cubesuite-android/
 │   ├── js/controls.js        slider e chave liga/desliga
 │   ├── js/stage.js           tela Palco e tela de ajuste
 │   ├── js/memory.js          aba Memórias (10 sons, fábrica e backup)
+│   ├── js/sounds.js          sons prontos para o culto (edite aqui)
 │   ├── js/setlist.js         aba Culto (setlist e pedal Bluetooth)
 │   ├── js/live.js            Boost, Mudo, Swell e Fade out
 │   ├── js/irlab.js           editor de IR
