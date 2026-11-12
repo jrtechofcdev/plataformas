@@ -26,7 +26,7 @@ CR.Library = (function () {
   var KNOB_ORDER = [["TYPE", 0], ["GAIN", 1], ["TONE", 2], ["REVERB", 3], ["FB", 4], ["VOLUME", 5], ["TIME", 6], ["MIX", 7], ["MOD", 8], ["IR CAB", 9]];
 
   var data = { kind: "biblioteca", version: 1, items: [] }, loaded = false;
-  var ui = { cat: "all", status: "all", q: "", sort: "likes", shown: PAGE };
+  var ui = { cat: "all", status: "all", q: "", sort: "new", shown: PAGE };
   var $ = function (s, r) { return (r || document).querySelector(s); };
 
   /* ================================================================ dados */
