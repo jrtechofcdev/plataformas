@@ -616,6 +616,14 @@ button { font: inherit; color: inherit; }
 .lib-cats .chip-btn[aria-pressed="true"] small { color: var(--brand-ink); }
 .lib-status button { min-height: 44px; font-size: 14px; }
 .lib-count { color: var(--muted); font-size: 13px; }
+.lib-countrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.exp-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.exp-list { display: grid; gap: 6px; max-height: 46dvh; overflow-y: auto; overscroll-behavior: contain; }
+.exp-row { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 6px 10px; border-radius: 10px; background: var(--surface-2); cursor: pointer; }
+.exp-row input { width: 22px; height: 22px; accent-color: var(--brand); flex: none; }
+.exp-row span { display: grid; min-width: 0; }
+.exp-row b { font: 700 16px var(--font-label); overflow-wrap: anywhere; }
+.exp-row small { color: var(--text-2); font-size: 12.5px; }
 .lib-list { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr)); }
 .lib-card { display: grid; gap: 10px; padding: 12px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--line); }
 .lib-card.ok { border-color: color-mix(in srgb, var(--led-green) 55%, var(--line)); }

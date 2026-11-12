@@ -191,6 +191,10 @@ CR.Memory = (function () {
       '<div class="mem-list">' + factory().map(factoryCard).join("") + "</div>" +
       '<h2 class="mem-sec">Sons prontos para o culto</h2><p class="mem-sub">' + CR.SOUNDS.length + " sons de ponto de partida, by Jr_Tech_OFC. Carregue em A, B ou C, ou toque na seta de guardar para copiar numa memória sua e ajustar. Nivele os volumes no ensaio.</p>" +
       '<div class="mem-list">' + CR.SOUNDS.map(readyCard).join("") + "</div>" +
+      '<article class="card"><header class="card-head">' + CR.icon("share") + "<div><h2>Exportar presets</h2><p>Um preset vira um .json; vários viram um .zip, que pode ser importado de novo na Biblioteca (aqui ou em outro celular).</p></div></header>" +
+        '<div class="mem-backup">' +
+        '<button class="btn" type="button" data-exp="mine"' + (used ? "" : " disabled") + ">" + CR.icon("memory") + "<span>Escolher memórias</span></button>" +
+        '<button class="btn" type="button" data-exp="ready">' + CR.icon("culto") + "<span>Sons prontos (" + CR.SOUNDS.length + ")</span></button></div></article>" +
       '<article class="card"><header class="card-head">' + CR.icon("save") + "<div><h2>Backup</h2><p>Guarde uma cópia das memórias para não perder ao trocar de celular.</p></div></header>" +
         '<div class="mem-backup">' +
         '<button class="btn" type="button" data-backup="export">' + CR.icon("save") + "<span>Salvar em Download</span></button>" +
@@ -213,6 +217,19 @@ CR.Memory = (function () {
     });
     view.querySelectorAll("[data-more]").forEach(function (b) { b.onclick = function () { menu(Number(b.dataset.more)); }; });
     bindTabs(view);
+    view.querySelectorAll("[data-exp]").forEach(function (b) {
+      b.onclick = function () {
+        if (b.dataset.exp === "ready") {
+          CR.Exporter.choose("Exportar sons prontos", CR.SOUNDS.map(function (s, i) {
+            return { label: s.name, sub: s.group, item: { name: s.name, description: s.desc, author: "Jr_Tech_OFC", values: readyValues(i) } };
+          }), "Sons prontos Cube Remote");
+          return;
+        }
+        var list = [];
+        data.slots.forEach(function (sl, i) { if (sl) list.push({ label: (i + 1) + ". " + sl.name, sub: summary(sl.values), item: asPreset(sl) }); });
+        CR.Exporter.choose("Exportar memórias", list, "Memorias Cube Remote");
+      };
+    });
     var add = view.querySelector("[data-addslot]");
     if (add) add.onclick = function () {
       if (data.slots.length >= N_MAX) return;
@@ -299,12 +316,14 @@ CR.Memory = (function () {
         '<button class="btn big danger" type="button" data-m="delete">' + CR.icon("trash") + "<span>Apagar</span></button>" +
         '<button class="btn big" type="button" data-m="up"' + (i === 0 ? " disabled" : "") + ">" + CR.icon("up") + "<span>Subir</span></button>" +
         '<button class="btn big" type="button" data-m="down"' + (i === data.slots.length - 1 ? " disabled" : "") + ">" + CR.icon("down") + "<span>Descer</span></button>" +
-      "</div>");
+      "</div>" +
+      '<button class="btn big wide" type="button" data-m="export">' + CR.icon("share") + "<span>Exportar este preset</span></button>");
     var d = document.getElementById("dialog");
     d.querySelectorAll("[data-replace]").forEach(function (b) {
       b.onclick = function () { d.hidden = true; saveDialog(i, Number(b.dataset.replace)); };
     });
     $('[data-m="rename"]', d).onclick = function () { renameDialog(i); };
+    $('[data-m="export"]', d).onclick = function () { d.hidden = true; CR.Exporter.run([asPreset(s)], s.name); };
     $('[data-m="delete"]', d).onclick = async function () {
       d.hidden = true;
       if (!(await CR.confirm("Apagar memória", 'Apagar "' + CR.esc(s.name) + '"? O preset da pedaleira não muda.', "Apagar"))) return;
@@ -404,6 +423,11 @@ CR.Memory = (function () {
 
   /* Abre o arquivo de memórias ao iniciar o app, para o Palco já mostrar os nomes. */
   function init() { return load().then(function () { CR.emit("memories"); }); }
+
+  /* Memória no formato de exportação (CR.Exporter). */
+  function asPreset(sl) {
+    return { name: sl.name, values: sl.values, description: "Memória do Cube Remote" + (sl.saved ? ", guardada em " + sl.saved.split("-").reverse().join("/") : "") };
+  }
 
   /* Guarda um som vindo de fora (Biblioteca) numa memória: nova ou substituindo uma existente. */
   function saveValues(values, name, cb) {

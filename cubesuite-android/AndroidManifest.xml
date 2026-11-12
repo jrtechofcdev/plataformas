@@ -33,5 +33,11 @@
                 android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
                 android:resource="@xml/usb_midi" />
         </activity>
+        <!-- Arquivos exportados (presets .json/.zip) para compartilhar com outros apps -->
+        <provider
+            android:name=".ExportProvider"
+            android:authorities="com.jrtechofc.cuberemote.files"
+            android:exported="false"
+            android:grantUriPermissions="true" />
     </application>
 </manifest>

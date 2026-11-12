@@ -51,6 +51,11 @@ Feito para mexer rápido e com precisão durante o culto, com botões grandes.
     Cada preset: **Testar em A, B ou C**, **Aprovar e guardar** numa memória nova ou existente,
     Descartar, mudar a categoria. Presets com MOD 0 (chorus no máximo) têm o botão "Tirar o chorus".
     Formato do arquivo: veja o topo de `js/library.js`. Ignora presets de Cube Baby Bass e AC.
+  - **Exportar**: um preset vira um `.json`; vários viram um `.zip` (um .json por preset, em pastas por
+    categoria), no mesmo formato da importação. Nas memórias: "Exportar este preset" no menu e
+    "Escolher memórias" (caixas de marcar); sons prontos; na Biblioteca: "Exportar este preset" e
+    "Exportar estes N" (o que estiver filtrado: categoria, Aprovados, busca). Salva na pasta Download
+    ou envia pelo compartilhar do Android (WhatsApp, Drive, e-mail).
   - Backup: salvar na pasta Download, enviar (WhatsApp, e-mail, Drive) e importar
     (arquivo ou texto colado). Arquivo do app: `memorias.json`, com cópia automática `memorias.bak.json`.
 - **Afinador** em aba própria: nota gigante, ponteiro ou **estroboscópio** (mostra menos de 1 cent),
@@ -109,6 +114,7 @@ cubesuite-android/
 │   ├── js/memory.js          aba Memórias (10 sons, fábrica e backup)
 │   ├── js/sounds.js          sons prontos para o culto (edite aqui)
 │   ├── js/library.js         Biblioteca: importação em lote (.zip/.json) e categorias
+│   ├── js/exporter.js        exportar presets (.json ou .zip)
 │   ├── js/setlist.js         aba Culto (setlist e pedal Bluetooth)
 │   ├── js/live.js            Boost, Mudo, Swell e Fade out
 │   ├── js/irlab.js           editor de IR
@@ -126,6 +132,7 @@ cubesuite-android/
 │   ├── PitchDetector.java    detecção de nota (YIN)
 │   ├── TunerEngine.java      gravação de áudio do afinador
 │   ├── EnvelopeRecorder.java nível do som a cada 1 ms (medição do delay)
+│   ├── ExportProvider.java   entrega os arquivos exportados para WhatsApp, Drive, e-mail
 │   └── AppLog.java           log
 ├── tests/                    testes no computador (protocolo e afinador)
 └── build.sh                  compila e assina o APK

@@ -228,7 +228,8 @@ CR.Library = (function () {
       '<div class="seg lib-status" role="group">' + STATUS.map(function (s) { return '<button type="button" data-st="' + s[0] + '" aria-pressed="' + (ui.status === s[0]) + '">' + s[1] + "</button>"; }).join("") + "</div>" +
       '<label class="field lib-sort"><span class="field-head"><span>Ordenar</span></span><select class="text-input" id="libSort">' +
         [["likes", "Mais curtidos"], ["new", "Mais recentes"], ["name", "Nome (A a Z)"]].map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === ui.sort ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + "</select></label>" +
-      '<p class="lib-count">' + r.list.length + " preset(s) nesta visão" + (CR.S.presets ? "" : ". Conecte a pedaleira para testar.") + "</p>" +
+      '<div class="lib-countrow"><p class="lib-count">' + r.list.length + " preset(s) nesta visão" + (CR.S.presets ? "" : ". Conecte a pedaleira para testar.") + "</p>" +
+        '<button class="btn" type="button" id="libExport"' + (r.list.length ? "" : " disabled") + ">" + CR.icon("share") + "<span>Exportar estes " + r.list.length + "</span></button></div>" +
       '<div class="lib-list">' + r.list.slice(0, ui.shown).map(card).join("") + "</div>" +
       (r.list.length > ui.shown ? '<button class="btn wide big" type="button" id="libMore">Mostrar mais (' + (r.list.length - ui.shown) + " restantes)</button>" : "") +
       '<article class="card"><header class="card-head">' + CR.icon("trash") + "<div><h2>Gerenciar</h2><p>As memórias que você guardou não são afetadas.</p></div></header>" +
@@ -241,6 +242,10 @@ CR.Library = (function () {
     view.querySelectorAll("[data-cat]").forEach(function (b) { b.onclick = function () { ui.cat = b.dataset.cat; ui.shown = PAGE; rerender(); }; });
     view.querySelectorAll("[data-st]").forEach(function (b) { b.onclick = function () { ui.status = b.dataset.st; ui.shown = PAGE; rerender(); }; });
     $("#libSort", view).onchange = function (e) { ui.sort = e.target.value; ui.shown = PAGE; rerender(); };
+    $("#libExport", view).onclick = function () {
+      var label = (ui.cat === "all" ? "Biblioteca" : CAT_NAME[ui.cat]) + (ui.status === "ok" ? " aprovados" : ui.status === "new" ? " para testar" : ui.status === "no" ? " descartados" : "");
+      CR.Exporter.run(current.slice(), label);
+    };
     var more = $("#libMore", view);
     if (more) more.onclick = function () { ui.shown += PAGE; rerender(); };
     view.querySelectorAll("[data-libtest]").forEach(function (b) {
@@ -291,9 +296,11 @@ CR.Library = (function () {
       (it.source.url ? '<p class="hint">Fonte: ' + CR.esc(it.source.url) + "</p>" : "") +
       '<label class="field"><span class="field-head"><span>Categoria</span></span><select class="text-input" id="libCat">' +
         CATS.map(function (c) { return '<option value="' + c[0] + '"' + (c[0] === it.category ? " selected" : "") + ">" + c[1] + "</option>"; }).join("") + "</select></label>" +
+      '<button class="btn big wide" type="button" data-exp1>' + CR.icon("share") + "<span>Exportar este preset</span></button>" +
       '<div class="mem-menu"><button class="btn big danger" type="button" data-del>' + CR.icon("trash") + "<span>Tirar da biblioteca</span></button>" +
       '<button class="btn big primary" type="button" data-close>' + CR.icon("check") + "<span>Fechar</span></button></div>");
     var d = document.getElementById("dialog");
+    $("[data-exp1]", d).onclick = function () { d.hidden = true; CR.Exporter.run([it], it.name); };
     $("#libCat", d).onchange = function (e) { it.category = e.target.value; it.catSet = true; persist(); rerender(); };
     $("[data-del]", d).onclick = function () {
       data.items.splice(data.items.indexOf(it), 1); persist(); d.hidden = true; rerender(); CR.emit("library");

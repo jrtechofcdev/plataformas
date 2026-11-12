@@ -65,6 +65,10 @@ var CR = window.CR || (window.CR = {});
           case "memSave": try { localStorage.setItem(a.name ? "cr.mock." + a.name : "cr.mock.mem", a.data); } catch (_) {} break;
           case "memExport": r = "CubeRemote-memorias-simulador.json"; break;
           case "memShare": break;
+          case "fileExport":
+            self.exported = self.exported || [];
+            self.exported.push({ name: a.name, size: atob(a.b64).length, share: a.share, b64: a.b64 });
+            r = a.name; break;
           case "irRead": r = { distance: 0.5, samples: self.irSlots[a.slot] || self.fakeIr(a.slot) }; break;
           case "irSave": self.irSlots[a.slot] = a.samples.slice(); break;
           case "irPreview": self.irPreviewed = a.samples.slice(); break;

@@ -932,6 +932,13 @@ public class MainActivity extends Activity {
                     try { resolve(id, true, JSONObject.quote(memExport(new JSONObject(argsJson).getString("data")))); }
                     catch (Exception e) { log.log("Erro no backup: " + e); resolve(id, false, JSONObject.quote(String.valueOf(e.getMessage()))); }
                     return;
+                case "fileExport":
+                    try {
+                        JSONObject o = new JSONObject(argsJson);
+                        resolve(id, true, JSONObject.quote(fileExport(o.getString("name"), o.getString("b64"),
+                                o.optString("mime", "application/octet-stream"), o.optBoolean("share", false))));
+                    } catch (Exception e) { log.log("Erro ao exportar: " + e); resolve(id, false, JSONObject.quote(String.valueOf(e.getMessage()))); }
+                    return;
                 case "memShare":
                     try { memShare(new JSONObject(argsJson).getString("data")); resolve(id, true, "true"); }
                     catch (Exception e) { resolve(id, false, JSONObject.quote(String.valueOf(e.getMessage()))); }
@@ -1114,6 +1121,41 @@ public class MainActivity extends Activity {
             out.write(json.getBytes(java.nio.charset.StandardCharsets.UTF_8));
         }
         log.log("Backup das memórias salvo em Download/" + name);
+        return name;
+    }
+
+    /**
+     * Exporta um arquivo (preset .json ou pacote .zip): salva na pasta Download ou abre o compartilhar
+     * do Android (WhatsApp, Drive, e-mail) com o arquivo anexado. Devolve o nome usado.
+     */
+    private String fileExport(String name, String b64, String mime, boolean share) throws Exception {
+        byte[] data = android.util.Base64.decode(b64, android.util.Base64.DEFAULT);
+        name = name.replaceAll("[\\/:*?\"<>|]", "_").trim();
+        if (name.isEmpty()) name = "preset.json";
+        if (share || Build.VERSION.SDK_INT < 29) {
+            java.io.File f = new java.io.File(ExportProvider.dir(this), name);
+            try (java.io.FileOutputStream out = new java.io.FileOutputStream(f)) { out.write(data); }
+            final Uri u = ExportProvider.uriFor(name);
+            final String type = mime;
+            main.post(() -> {
+                Intent i = new Intent(Intent.ACTION_SEND);
+                i.setType(type);
+                i.putExtra(Intent.EXTRA_STREAM, u);
+                i.setClipData(ClipData.newRawUri("", u));
+                i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                startActivity(Intent.createChooser(i, "Enviar presets"));
+            });
+            log.log("Exportado para compartilhar: " + name + " (" + data.length + " bytes)");
+            return name;
+        }
+        android.content.ContentValues v = new android.content.ContentValues();
+        v.put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, name);
+        v.put(android.provider.MediaStore.MediaColumns.MIME_TYPE, mime);
+        v.put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS);
+        Uri u = getContentResolver().insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, v);
+        if (u == null) throw new java.io.IOException("o Android não liberou a pasta Download");
+        try (java.io.OutputStream out = getContentResolver().openOutputStream(u)) { out.write(data); }
+        log.log("Exportado em Download/" + name + " (" + data.length + " bytes)");
         return name;
     }
 
