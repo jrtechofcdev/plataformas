@@ -28,9 +28,8 @@ As cores e os nomes continuam os da pedaleira, para reconhecer cada controle sem
 - **Superfícies**: fundo `#07090c` com um brilho verde-água bem leve no alto. Cartões e botões com
   gradiente vertical sutil (`--sheen`), borda de 1 px quase invisível, um fio de luz no topo (`--hl`)
   e sombra em 3 alturas (`--e1`, `--e2`, `--e3`). Tudo em `css/tokens.css`.
-- **Vidro** (desfoque `--blur`): só no "cromo" do app, por onde o conteúdo passa por baixo: topo,
-  barra de abas em pílula, janelas (folhas), avisos, abas internas e chips grudados no topo.
-  Nunca nos 10 controles do Palco (desempenho e leitura).
+- **Superfícies do "cromo"** (topo, barra de abas, janelas, avisos, abas grudadas): sólidas, com o mesmo
+  tom escuro. A translucidez com desfoque (vidro) da 2.7 saiu na 2.8: pesava muito no celular.
 - **Gradiente da marca** (`--brand-grad`, verde-água para ciano): botão principal, Conectar, aba
   ativa, opção escolhida e a assinatura "by Jr_Tech_OFC".
 - **Gradiente do LED**: o estado ativo de preset, módulo, controle, atalho e modelo ganha um
@@ -46,12 +45,20 @@ As cores e os nomes continuam os da pedaleira, para reconhecer cada controle sem
 | Tela de ajuste | nasce do controle tocado e fecha voltando para ele; setas deslizam | 320 ms |
 | Números | rolam para cima quando o valor sobe e para baixo quando desce | 230 ms |
 | Trocar de preset | os 10 valores entram em cascata | 300 ms |
-| LEDs acesos | halo "respira" devagar; módulo ligado dá um flash curto | 3,4 s / 550 ms |
+| LEDs acesos | halo fixo; módulo ligado dá um flash curto | 550 ms |
 | Janelas | sobem com mola; fecham descendo; arrastar a alça para baixo fecha | 320 ms |
 | Avisos e "Aguarde" | avisos sobem em pílula; "Aguarde" só aparece se passar de 0,15 s | 200 ms |
 
 Regras: animar só posição e transparência; o atributo `hidden` continua mandando (o CSS segura o
 elemento visível pelo tempo da saída); nada de animação que atrase um toque. Código em `js/ui.js`.
+
+## Desempenho (versão 2.8)
+- Nada de `backdrop-filter` (translucidez/desfoque) nem `filter: drop-shadow`.
+- Nenhuma animação infinita: LEDs acesos têm halo fixo; só o ponto de "Procurando" pisca, e só enquanto procura.
+- Sombras e brilhos curtos (borrão grande custa caro a cada quadro). Nada de brilho em texto que muda o tempo todo.
+- Com uma tela por cima (ajuste, EQ, log, janela), o Palco embaixo não anima (classe `covered`).
+- Um passo de controle redesenha só o bloco dele; o resto do Palco, uma vez por quadro.
+- Medir antes de enfeitar: Ajustes > Avançado > Desempenho.
 
 ## Cores
 | Papel | Valor | Por quê |

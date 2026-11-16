@@ -5,7 +5,7 @@ var CR = window.CR || (window.CR = {});
 
 CR.Settings = (function () {
   var $ = function (s, root) { return (root || document).querySelector(s); };
-  var appInfo = { version: "2.7.1" };
+  var appInfo = { version: "2.8.0" };
 
   function seg(name, options, current) {
     return '<div class="seg" role="group" data-seg="' + name + '">' + options.map(function (o) {
@@ -45,10 +45,14 @@ CR.Settings = (function () {
       '<article class="card"><header class="card-head">' + CR.icon("learn") + "<div><h2>Aprender</h2><p>Controles, módulos, os 9 TYPE, os 9 IR CAB, modos e receitas de timbre.</p></div></header>" +
         '<button class="btn wide" type="button" id="btnLearn">' + CR.icon("learn") + "<span>Abrir Aprender</span></button></article>" +
 
-      '<article class="card"><header class="card-head">' + CR.icon("usb") + "<div><h2>Conexão</h2><p>" + statusText(st) + "</p></div></header>" +
+      '<article class="card" id="connCard"><header class="card-head">' + CR.icon("usb") + "<div><h2>Conexão</h2><p>" + statusText(st) + "</p></div></header>" +
         '<dl class="info-list">' + infoRows(st) + "</dl>" +
         '<button class="btn wide" type="button" id="btnReconnect">' + CR.icon("plug") + "<span>Reconectar</span></button></article>" +
 
+      '<article class="card"><header class="card-head">' + CR.icon("wave") + "<div><h2>Desempenho</h2><p>Meça como o app roda neste celular.</p></div></header>" +
+        '<div class="set-row"><div><b>Mostrar medidor</b><span>Quadros por segundo e travadas, no canto da tela.</span></div><span id="swMeter"></span></div>' +
+        '<button class="btn wide" type="button" id="btnPerf">' + CR.icon("play") + "<span>Testar desempenho (15 s)</span></button>" +
+        '<p class="hint">O teste percorre o app sozinho e não mexe na pedaleira. O resultado também vai para o Log.</p></article>' +
       '<article class="card"><header class="card-head">' + CR.icon("list") + "<div><h2>Avançado</h2><p>Para diagnosticar problemas de conexão.</p></div></header>" +
         '<button class="btn wide" type="button" id="btnLog">' + CR.icon("list") + "<span>Abrir log</span></button></article>" +
 
@@ -81,6 +85,11 @@ CR.Settings = (function () {
     });
     $("#btnReconnect").onclick = function () { CR.native("connect"); };
     $("#btnLog").onclick = openLog;
+    var sm = CR.makeSwitch(!!CR.prefs.perfMeter, "Mostrar medidor", function () {
+      CR.prefs.perfMeter = !CR.prefs.perfMeter; CR.savePrefs(); sm.set(CR.prefs.perfMeter); CR.Perf.meter(CR.prefs.perfMeter);
+    });
+    $("#swMeter").appendChild(sm);
+    $("#btnPerf").onclick = function () { CR.Perf.run(); };
     $("#btnLearn").onclick = function () { CR.App.go("learn"); };
     CR.Follow.bindCard($("#followCard"));
     $("#eqRestore").onclick = async function () {
@@ -91,6 +100,17 @@ CR.Settings = (function () {
       var usb = (list || []).some(function (x) { return x.id === "usb"; });
       if (!usb) $("#inputsHint").textContent += " No momento nenhuma entrada USB de áudio foi encontrada.";
     }).catch(function () {});
+  }
+
+  /* Desempenho: um aviso de conexão só atualiza o cartão Conexão e o do footswitch (não a página toda). */
+  function refreshStatus() {
+    var v = document.getElementById("view-settings"), card = document.getElementById("connCard");
+    if (!v || !card) { render(); return; }
+    var st = CR.S.status;
+    card.querySelector(".card-head p").textContent = statusText(st);
+    card.querySelector(".info-list").innerHTML = infoRows(st);
+    var fc = document.getElementById("followCard");
+    if (fc) { var tmp = document.createElement("div"); tmp.innerHTML = CR.Follow.cardHtml(); fc.replaceWith(tmp.firstChild); CR.Follow.bindCard(document.getElementById("followCard")); }
   }
 
   function statusText(st) {
@@ -118,7 +138,12 @@ CR.Settings = (function () {
       '<label class="check"><input type="checkbox" id="logFollow" checked> Rolar automaticamente</label></div>' +
       '<pre id="logView" tabindex="0"></pre>';
     p.hidden = false;
-    p.querySelector("[data-close]").onclick = function () { p.hidden = true; };
+    p.querySelector("[data-close]").onclick = closeLog;
+    logSize = 0;
+    // o Android só manda o log ao vivo (e registra os bytes) enquanto este painel estiver aberto
+    CR.native("setLogLive", { on: true }).catch(function () {});
+    CR.native("setTrace", { on: CR.prefs.logTrace !== false }).catch(function () {});
+    $("#logTrace").checked = CR.prefs.logTrace !== false;
     p.querySelectorAll("[data-a]").forEach(function (b) {
       b.onclick = async function () {
         var a = b.dataset.a;
@@ -128,20 +153,29 @@ CR.Settings = (function () {
         CR.native(a).then(function () { if (a === "copyLog") CR.toast("Log copiado"); }).catch(function (e) { CR.toast(e.message, true); });
       };
     });
-    $("#logTrace").onchange = function (e) { CR.native("setTrace", { on: e.target.checked }); };
-    CR.native("getLog").then(function (t) { $("#logView").textContent = t; $("#logView").scrollTop = 1e9; }).catch(function () {});
+    $("#logTrace").onchange = function (e) { CR.prefs.logTrace = e.target.checked; CR.savePrefs(); CR.native("setTrace", { on: e.target.checked }); };
+    CR.native("getLog").then(function (t) { $("#logView").textContent = t; logSize = t.length; $("#logView").scrollTop = 1e9; }).catch(function () {});
   }
+  function closeLog() {
+    var p = document.getElementById("logPanel");
+    if (!p || p.hidden) return;
+    p.hidden = true;
+    CR.native("setLogLive", { on: false }).catch(function () {});
+    CR.native("setTrace", { on: false }).catch(function () {});
+  }
+  /* Log ao vivo: acrescenta só o pedaço novo (antes o texto inteiro, até 200 KB, era refeito a cada pedaço). */
+  var logSize = 0;
   CR.on("log", function (chunk) {
-    var v = document.getElementById("logView");
-    if (!v) return;
-    var t = v.textContent + chunk;
-    if (t.length > 200000) t = t.slice(t.length - 200000);
-    v.textContent = t;
+    var v = document.getElementById("logView"), p = document.getElementById("logPanel");
+    if (!v || !p || p.hidden) return;
+    v.appendChild(document.createTextNode(chunk));
+    logSize += chunk.length;
+    if (logSize > 250000) { var t = v.textContent.slice(-150000); v.textContent = t; logSize = t.length; }
     var f = document.getElementById("logFollow");
     if (!f || f.checked) v.scrollTop = v.scrollHeight;
   });
 
   CR.native("appInfo").then(function (i) { appInfo = i || appInfo; }).catch(function () {});
 
-  return { render: render, openLog: openLog };
+  return { render: render, refreshStatus: refreshStatus, openLog: openLog, closeLog: closeLog };
 })();

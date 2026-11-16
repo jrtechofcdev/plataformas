@@ -59,13 +59,16 @@ import java.util.concurrent.TimeUnit;
  * Tudo é registrado no log (AppLog), visível em Ajustes > Log.
  */
 public class MainActivity extends Activity {
-    static final String VERSION = "2.7.1";
+    static final String VERSION = "2.8.0";
     private static final int PICK_FILE = 41;
     private static final String ACTION_USB_PERMISSION = "com.jrtechofc.cuberemote.USB_PERMISSION";
 
     private WebView web;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
+    /* Arquivos (memórias, biblioteca, EQ, exportar) numa fila própria: a ponte JavaScript responde na hora
+       e a tela nunca congela esperando o disco. Uma thread só, para as gravações saírem na ordem. */
+    private final ExecutorService io = Executors.newSingleThreadExecutor();
     private AppLog log;
     private MidiManager midi;
     private UsbManager usb;
@@ -101,8 +104,9 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle saved) {
         super.onCreate(saved);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON); // tela não apaga no palco
-        getWindow().setStatusBarColor(Color.parseColor("#0b0d10"));
-        getWindow().setNavigationBarColor(Color.parseColor("#0b0d10"));
+        getWindow().setStatusBarColor(Color.parseColor("#07090c"));
+        getWindow().setNavigationBarColor(Color.parseColor("#07090c"));
+        getWindow().setBackgroundDrawable(null);   // a WebView cobre a tela toda: sem pintar o fundo duas vezes
 
         log = new AppLog(this);
         CubeDevice.logger = log;
@@ -115,11 +119,14 @@ public class MainActivity extends Activity {
                 + " · USB host (OTG): " + pm.hasSystemFeature(PackageManager.FEATURE_USB_HOST));
 
         web = new WebView(this);
-        web.setBackgroundColor(Color.parseColor("#0b0d10"));
+        web.setBackgroundColor(Color.parseColor("#07090c"));
         WebSettings ws = web.getSettings();
         ws.setJavaScriptEnabled(true);
         ws.setDomStorageEnabled(true);
         ws.setAllowFileAccess(true);
+        ws.setTextZoom(100);                                  // o layout não muda com a fonte do sistema
+        if (Build.VERSION.SDK_INT >= 23) ws.setOffscreenPreRaster(true);      // rola e troca de tela sem "pintar no susto"
+        if (Build.VERSION.SDK_INT >= 26) web.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, true);
         web.addJavascriptInterface(new Bridge(), "CubeNative");
         web.setWebChromeClient(new WebChromeClient() {
             @Override
@@ -392,11 +399,14 @@ public class MainActivity extends Activity {
     protected void onPause() {
         super.onPause();
         if (tuner != null && tuner.isRunning()) tuner.stop();   // não grava áudio com o app em segundo plano
+        if (web != null) web.onPause();                         // pausa animações enquanto o app não aparece
+        if (log != null) log.flushSoon();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
+        if (web != null) web.onResume();
         if (tunerWanted && tuner != null && !tuner.isRunning()
                 && checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED)
             tuner.start(tunerSource);
@@ -852,8 +862,28 @@ public class MainActivity extends Activity {
         js("window.cubeEvent && window.cubeEvent(" + JSONObject.quote(name) + "," + data + ")");
     }
 
+    /* Eventos e respostas para a página saem em lote: tudo o que chegar antes da próxima volta da thread
+       principal vai num único evaluateJavascript (cada um protegido por try, um erro não derruba os outros). */
+    private final StringBuilder jsQueue = new StringBuilder();
+    private boolean jsFlushPosted = false;
+
     private void js(final String code) {
-        main.post(() -> web.evaluateJavascript(code, null));
+        synchronized (jsQueue) {
+            jsQueue.append("try{").append(code).append("}catch(e){console.error(e)}\n");
+            if (jsFlushPosted) return;
+            jsFlushPosted = true;
+        }
+        main.post(this::flushJs);
+    }
+
+    private void flushJs() {
+        String code;
+        synchronized (jsQueue) {
+            code = jsQueue.toString();
+            jsQueue.setLength(0);
+            jsFlushPosted = false;
+        }
+        if (!code.isEmpty() && web != null) web.evaluateJavascript(code, null);
     }
 
     private void queueLogToScreen(String line) {
@@ -879,7 +909,10 @@ public class MainActivity extends Activity {
         public void call(final String id, final String method, final String argsJson) {
             switch (method) {   // estas não precisam esperar a fila da pedaleira
                 case "connect": connectAsync(); resolve(id, true, "null"); return;
-                case "getLog": resolve(id, true, JSONObject.quote(log.all())); return;
+                case "getLog": io.execute(() -> resolve(id, true, JSONObject.quote(log.all()))); return;
+                case "setLogLive":
+                    try { log.setLive(new JSONObject(argsJson).optBoolean("on", false)); } catch (Exception ignored) {}
+                    resolve(id, true, "null"); return;
                 case "clearLog": log.clear(); log.log("Log limpo."); resolve(id, true, "null"); return;
                 case "copyLog": copyLog(); resolve(id, true, "null"); return;
                 case "shareLog": shareLog(); resolve(id, true, "null"); return;
@@ -923,26 +956,26 @@ public class MainActivity extends Activity {
                     }, "envelope").start();
                     return;
                 }
-                case "memLoad": resolve(id, true, JSONObject.quote(memLoad(storeName(argsJson)))); return;
-                case "memSave":
+                case "memLoad": io.execute(() -> resolve(id, true, JSONObject.quote(memLoad(storeName(argsJson))))); return;
+                case "memSave": io.execute(() -> {
                     try { memSave(storeName(argsJson), new JSONObject(argsJson).getString("data")); resolve(id, true, "true"); }
                     catch (Exception e) { log.log("Erro ao salvar memórias: " + e); resolve(id, false, JSONObject.quote("Não consegui salvar as memórias: " + e.getMessage())); }
-                    return;
-                case "memExport":
+                }); return;
+                case "memExport": io.execute(() -> {
                     try { resolve(id, true, JSONObject.quote(memExport(new JSONObject(argsJson).getString("data")))); }
                     catch (Exception e) { log.log("Erro no backup: " + e); resolve(id, false, JSONObject.quote(String.valueOf(e.getMessage()))); }
-                    return;
-                case "fileExport":
+                }); return;
+                case "fileExport": io.execute(() -> {
                     try {
                         JSONObject o = new JSONObject(argsJson);
                         resolve(id, true, JSONObject.quote(fileExport(o.getString("name"), o.getString("b64"),
                                 o.optString("mime", "application/octet-stream"), o.optBoolean("share", false))));
                     } catch (Exception e) { log.log("Erro ao exportar: " + e); resolve(id, false, JSONObject.quote(String.valueOf(e.getMessage()))); }
-                    return;
-                case "memShare":
+                }); return;
+                case "memShare": io.execute(() -> {
                     try { memShare(new JSONObject(argsJson).getString("data")); resolve(id, true, "true"); }
                     catch (Exception e) { resolve(id, false, JSONObject.quote(String.valueOf(e.getMessage()))); }
-                    return;
+                }); return;
                 case "audioInputs": resolve(id, true, tuner.inputs().toString()); return;
                 case "setOrientation":
                     try { applyOrientation(new JSONObject(argsJson).optString("mode", "auto")); } catch (Exception ignored) {}
@@ -958,9 +991,7 @@ public class MainActivity extends Activity {
                 }
                     resolve(id, true, "null"); return;
                 case "appInfo":
-                    resolve(id, true, "{\"version\":" + JSONObject.quote(VERSION) + ",\"android\":"
-                            + JSONObject.quote(Build.VERSION.RELEASE) + ",\"device\":"
-                            + JSONObject.quote(Build.MANUFACTURER + " " + Build.MODEL) + "}");
+                    resolve(id, true, appInfo().toString());
                     return;
                 case "setTrace":
                     try { CubeDevice.traceBytes = new JSONObject(argsJson).getBoolean("on"); } catch (Exception ignored) {}
@@ -1055,6 +1086,27 @@ public class MainActivity extends Activity {
         private void resolve(String id, boolean ok, String json) {
             js("window.cubeResolve && window.cubeResolve(" + JSONObject.quote(id) + "," + ok + "," + json + ")");
         }
+    }
+
+    /* Dados do aparelho para o teste de desempenho (Ajustes > Avançado > Desempenho). */
+    private JSONObject appInfo() {
+        JSONObject o = new JSONObject();
+        try {
+            o.put("version", VERSION).put("android", Build.VERSION.RELEASE).put("sdk", Build.VERSION.SDK_INT)
+             .put("device", Build.MANUFACTURER + " " + Build.MODEL).put("cores", Runtime.getRuntime().availableProcessors());
+            android.app.ActivityManager am = (android.app.ActivityManager) getSystemService(ACTIVITY_SERVICE);
+            if (am != null) {
+                android.app.ActivityManager.MemoryInfo mi = new android.app.ActivityManager.MemoryInfo();
+                am.getMemoryInfo(mi);
+                o.put("ramMB", mi.totalMem / (1024 * 1024)).put("lowRam", am.isLowRamDevice()).put("memClassMB", am.getMemoryClass());
+            }
+            if (Build.VERSION.SDK_INT >= 26) {
+                android.content.pm.PackageInfo wv = WebView.getCurrentWebViewPackage();
+                if (wv != null) o.put("webview", wv.packageName + " " + wv.versionName);
+            }
+            o.put("refreshHz", Math.round(getWindowManager().getDefaultDisplay().getRefreshRate()));
+        } catch (Exception ignored) {}
+        return o;
     }
 
     private String logForSharing() {

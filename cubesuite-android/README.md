@@ -4,8 +4,13 @@ App Android para controlar a pedaleira **Cube Baby** pelo cabo USB (OTG), em tem
 em pé ou deitado. Criado do zero por José Renato (Jr_Tech_OFC).
 © 2026 José Renato · Jr_Tech_OFC. Todos os direitos reservados (veja `LICENSE`).
 
-## Funções (versão 2.7)
+## Funções (versão 2.8)
 Feito para mexer rápido e com precisão durante o culto, com botões grandes.
+- **Mais leve e fluido (2.8)**: log gravado em lote numa thread própria (antes abria o arquivo a cada linha),
+  registro de bytes só com o Log aberto, leitura e gravação de arquivos sem congelar a tela, eventos para a
+  tela em lote, Palco atualizando só o controle mexido, nomes de A/B/C por índice (antes ~2.100
+  comparações por passo), sem translucidez/desfoque e sem animações que nunca param.
+  **Ajustes > Avançado > Desempenho**: medidor na tela e "Testar desempenho" (o resultado vai para o Log).
 - **Interface refinada (2.7)**: visual escuro com vidro e gradientes, barra de abas flutuante em
   pílula, telas que deslizam, janelas que sobem e descem (arraste a alça para baixo para fechar),
   números que rolam, LEDs que respiram e onda de luz no toque. Em **Ajustes > Tela > Animações**,
@@ -98,7 +103,7 @@ Feito para mexer rápido e com precisão durante o culto, com botões grandes.
 - Desfazer e **trava de palco** (segurar o cadeado 1 s para destravar) no topo.
 
 ## Instalar
-1. Copie `CubeRemote-2.7.1.apk` para o celular e abra (permita "fontes desconhecidas").
+1. Copie `CubeRemote-2.8.0.apk` para o celular e abra (permita "fontes desconhecidas").
    Instala por cima das versões anteriores (mesma chave de assinatura).
 2. Ligue a pedaleira com cabo USB + adaptador OTG. O app conecta sozinho.
 3. Na primeira vez que abrir o afinador, permita o uso do microfone.
@@ -114,7 +119,7 @@ IR CAB e os módulos 1, 2 e 3 nos bytes 10, 11 e 12.
 ## Gerar o APK (sem Android Studio)
 ```bash
 sdkmanager "platforms;android-34" "build-tools;35.0.0"
-ANDROID_HOME=~/android-sdk ./build.sh        # gera dist/CubeRemote-2.7.1.apk
+ANDROID_HOME=~/android-sdk ./build.sh        # gera dist/CubeRemote-2.8.0.apk
 ```
 A assinatura usa `~/.cuberemote.jks`. Guarde esse arquivo: sem ele, uma versão nova não instala por cima.
 
@@ -130,6 +135,7 @@ cubesuite-android/
 │   ├── js/model.js           controles da pedaleira, nomes do TYPE e IR CAB, envio, desfazer
 │   ├── js/controls.js        slider e chave liga/desliga
 │   ├── js/ui.js              movimento: troca de abas, pílula, onda de luz, janelas, cascata
+│   ├── js/perf.js            medidor e teste de desempenho (Ajustes > Avançado)
 │   ├── js/stage.js           tela Palco e tela de ajuste
 │   ├── js/memory.js          aba Memórias (10 sons, fábrica e backup)
 │   ├── js/sounds.js          sons prontos para o culto (edite aqui)

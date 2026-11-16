@@ -39,6 +39,7 @@ CR.Library = (function () {
     }).catch(function () { loaded = true; });
   }
   function persist() {
+    if (CR.Memory && CR.Memory.invalidateNames) CR.Memory.invalidateNames();   // nomes dos presets podem ter mudado
     return CR.native("memSave", { name: "biblioteca", data: JSON.stringify(data) }).catch(function (e) { CR.toast(e.message, true); });
   }
 
@@ -314,5 +315,5 @@ CR.Library = (function () {
   }
 
   return { render: render, count: function () { return data.items.length; }, init: function () { return load().then(function () { CR.emit("library"); }); },
-           importFiles: importFiles, nameFor: nameFor, _normalize: normalize, _categorize: categorize, _unzip: unzip, CATS: CATS };
+           importFiles: importFiles, nameFor: nameFor, eachItem: function (fn) { data.items.forEach(fn); }, _normalize: normalize, _categorize: categorize, _unzip: unzip, CATS: CATS };
 })();

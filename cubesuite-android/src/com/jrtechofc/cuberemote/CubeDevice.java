@@ -45,7 +45,7 @@ public class CubeDevice {
     public interface Logger { void log(String line); }
     public static volatile Logger logger = null;
     /** Se true, registra cada pacote enviado/recebido (bom para diagnóstico). */
-    public static volatile boolean traceBytes = true;
+    public static volatile boolean traceBytes = false;   // liga com o painel Log aberto (ou no diagnóstico)
 
     public static void log(String s) { Logger l = logger; if (l != null) l.log(s); }
 

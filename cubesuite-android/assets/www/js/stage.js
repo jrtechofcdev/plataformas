@@ -101,6 +101,25 @@ CR.Stage = (function () {
       { duration: 420, easing: "cubic-bezier(.34, 1.45, .55, 1)" });
   }
 
+  /* Desempenho: um passo de controle atualiza na hora só o bloco dele (e a tela de ajuste);
+     o resto do Palco (nomes de A/B/C, módulos, EQ) é atualizado uma vez por quadro, juntando
+     todos os passos que chegaram nesse meio-tempo. */
+  var framePending = false;
+  function refreshSoon() {
+    if (framePending) return;
+    framePending = true;
+    requestAnimationFrame(function () { framePending = false; refresh(); });
+  }
+  function onChanged(d) {
+    if (!d || typeof d.offset !== "number" || (d.preset !== undefined && d.preset !== CR.S.preset)) { refreshSoon(); return; }
+    var mod = -1;
+    CR.MODULES.forEach(function (m, i) { if (m.off === d.offset) mod = i + 1; });
+    if (mod > 0) { refresh(); return; }                       // ligar/desligar módulo mexe em vários blocos
+    CR.CONTROLS.forEach(function (c) { if (c.off === d.offset) refreshTile(c); });
+    if (adj.c && adj.c.off === d.offset) refreshAdjust();
+    refreshSoon();
+  }
+
   function refresh() {
     paintEq();
     document.querySelectorAll(".preset-btn").forEach(function (b, i) {
@@ -323,7 +342,7 @@ CR.Stage = (function () {
 
   /* Voltar do Android e tecla Esc fecham a camada aberta (log, diálogo, ajuste). */
   window.cubeBack = function () {
-    if (!$("#logPanel").hidden) { $("#logPanel").hidden = true; return true; }
+    if (!$("#logPanel").hidden) { CR.Settings.closeLog(); return true; }
     if (!$("#dialog").hidden) { $("#dialog").hidden = true; return true; }
     if (!$("#eqScreen").hidden) { CR.EQScreen.close(); return true; }
     if (!$("#adjust").hidden) { closeAdjust(); return true; }
@@ -334,11 +353,11 @@ CR.Stage = (function () {
   };
   document.addEventListener("keydown", function (e) { if (e.key === "Escape") window.cubeBack(); });
 
-  CR.on("changed", refresh);
-  CR.on("memories", refresh);
+  CR.on("changed", onChanged);
+  CR.on("memories", refreshSoon);
   CR.on("eq", refresh);
   document.getElementById("eqStrip").onclick = function () { if (!CR.S.locked) CR.EQScreen.open(); };
-  CR.on("playing", refresh);
+  CR.on("playing", refreshSoon);
   CR.on("preset", function () {
     if (adj.c) adj.start = CR.val(adj.c);
     refresh();

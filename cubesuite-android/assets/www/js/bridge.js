@@ -81,12 +81,14 @@ var CR = window.CR || (window.CR = {});
           case "loopback": r = self.loop = a.on; break;
           case "getLog": r = "[simulador] log\n"; break;
           case "audioInputs": r = [{ id: "mic", name: "Microfone do celular" }, { id: "usb", name: "Entrada USB (simulada)" }]; break;
-          case "appInfo": r = { version: "2.0.0", android: "simulador", device: "navegador" }; break;
+          case "appInfo": r = { version: "simulador", android: "simulador", device: "navegador", cores: navigator.hardwareConcurrency || 0,
+                                webview: navigator.userAgent.replace(/.*Chrome\/([\d.]+).*/, "Chrome $1") }; break;
+          case "setLogLive": self.logLive = !!a.on; break;
           case "tunerStart": self.startTuner(a.source); break;
           case "tunerStop": clearInterval(self.tunerTimer); self.tunerTimer = null; break;
           default: break;
         }
-        if (window.cubeLog && m !== "getLog" && m !== "haptic") window.cubeLog("[simulador] " + m + " " + json + "\n");
+        if (self.logLive && window.cubeLog && m !== "getLog" && m !== "haptic") window.cubeLog("[simulador] " + m + " " + json + "\n");
         window.cubeResolve(id, true, r);
       }, 25);
     },

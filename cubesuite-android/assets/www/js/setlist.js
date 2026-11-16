@@ -317,7 +317,10 @@ CR.Culto = (function () {
   window.cubeKey = function (name) { onPedal(name === "VolumeUp" ? 1 : -1, name === "VolumeUp" ? "Volume +" : "Volume -"); };
 
   CR.on("memories", render);
-  CR.on("status", function () { setTimeout(render, 0); });
+  // Desempenho: só redesenha quando a pedaleira conecta ou desconecta (não a cada aviso de estado).
+  // setTimeout: espera o app.js atualizar CR.S.connected, que roda depois deste ouvinte.
+  var lastConn = null;
+  CR.on("status", function () { setTimeout(function () { if (CR.S.connected === lastConn) return; lastConn = CR.S.connected; render(); }, 0); });
 
   return { render: render, data: function () { return data; }, next: next, prev: prev,
            importData: function (o) { data = clean(o); persist(); render(); },

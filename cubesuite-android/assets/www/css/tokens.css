@@ -31,16 +31,16 @@
   --sheen: linear-gradient(180deg, rgba(255, 255, 255, .045), rgba(255, 255, 255, .008) 55%, rgba(0, 0, 0, .06));
   --hl: inset 0 1px 0 rgba(255, 255, 255, .07);
   --e1: 0 1px 2px rgba(0, 0, 0, .45), 0 4px 12px -4px rgba(0, 0, 0, .5);
-  --e2: 0 10px 28px -8px rgba(0, 0, 0, .7);
-  --e3: 0 24px 60px -12px rgba(0, 0, 0, .85);
+  --e2: 0 8px 18px -8px rgba(0, 0, 0, .7);
+  --e3: 0 12px 28px -10px rgba(0, 0, 0, .85);         /* sombras curtas: borrão grande pesa no celular */
   --brand-grad: linear-gradient(135deg, #46f2c4 0%, var(--brand) 45%, var(--brand-2) 100%);
   --brand-glow: 0 8px 24px -8px rgba(51, 234, 184, .55);
 
-  /* vidro: só no topo, na barra de abas, nas janelas e nos avisos */
-  --glass: rgba(15, 18, 23, .66);
-  --glass-strong: rgba(13, 15, 19, .86);
+  /* barra de abas, janelas e avisos: superfícies sólidas (sem translucidez nem desfoque,
+     que pesam muito no celular; versão 2.8) */
+  --glass: #11141a;
+  --glass-strong: #12151a;
   --glass-line: rgba(255, 255, 255, .09);
-  --blur: blur(20px) saturate(160%);
 
   /* pedaleira */
   --panel-top: #18191c;

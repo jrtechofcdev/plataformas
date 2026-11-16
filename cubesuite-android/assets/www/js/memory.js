@@ -74,6 +74,7 @@ CR.Memory = (function () {
   }
 
   function persist() {
+    invalidateNames();
     // tira os espaços vazios do fim (acima do mínimo), para a lista não crescer à toa
     while (data.slots.length > N && data.slots[data.slots.length - 1] === null) data.slots.pop();
     CR.emit("memories");
@@ -416,14 +417,28 @@ CR.Memory = (function () {
   CR.on("preset", refresh);
 
   /* Nome da memória cujo som é igual ao preset p agora (para os botões A, B, C do Palco). */
+  /* Desempenho: em vez de comparar o preset com todas as memórias, sons prontos e os ~700 da Biblioteca
+     a cada passo de um controle, o app monta uma vez um índice "13 bytes do som -> nome" e só consulta.
+     O índice é refeito quando memórias, Biblioteca ou presets de fábrica mudam (invalidateNames).
+     A ordem de prioridade é a mesma de antes: memórias, fábrica, sons prontos, Biblioteca. */
+  var nameIdx = null;
+  function sig(v) { return Array.prototype.slice.call(v, 0, 13).join(","); }
+  function addName(v, name) { if (v && v.length >= 13) { var k = sig(v); if (!nameIdx.has(k)) nameIdx.set(k, name); } }
+  function invalidateNames() { nameIdx = null; }
   function nameFor(p) {
-    for (var i = 0; i < data.slots.length; i++) { var sl = data.slots[i]; if (sl && sameAs(sl.values, p)) return sl.name; }
-    var f = factory();
-    for (var j = 0; j < 3; j++) if (sameAs(f[j], p)) return "Fábrica " + LETTERS[j];
-    for (var k = 0; k < CR.SOUNDS.length; k++) if (sameAs(readyValues(k), p)) return CR.SOUNDS[k].name;
-    if (CR.Library) return CR.Library.nameFor(p);
-    return "";
+    if (!CR.S.presets) return "";
+    if (!nameIdx) {
+      nameIdx = new Map();
+      data.slots.forEach(function (sl) { if (sl) addName(sl.values, sl.name); });
+      factory().forEach(function (f, j) { addName(f, "Fábrica " + LETTERS[j]); });
+      CR.SOUNDS.forEach(function (snd, k) { addName(readyValues(k), snd.name); });
+      if (CR.Library) CR.Library.eachItem(function (it) { addName(it.values, it.name); });
+    }
+    return nameIdx.get(sig(CR.EQ ? CR.EQ.realValues(p) : CR.S.presets[p])) || "";
   }
+  CR.on("memories", invalidateNames);
+  CR.on("library", invalidateNames);
+  CR.on("status", invalidateNames);
 
   /* Abre o arquivo de memórias ao iniciar o app, para o Palco já mostrar os nomes. */
   function init() { return load().then(function () { CR.emit("memories"); }); }
@@ -475,7 +490,7 @@ CR.Memory = (function () {
     return null;
   }
 
-  return { render: render, refresh: refresh, nameFor: nameFor, init: init, options: options, byRef: byRef, saveValues: saveValues,
+  return { render: render, refresh: refresh, nameFor: nameFor, invalidateNames: invalidateNames, init: init, options: options, byRef: byRef, saveValues: saveValues,
            clean: function (v) { return cleanSlot({ values: v }); }, sameAs: sameAs, summary: summary, mods: mods, loadButtons: loadButtons, applyTo: applyTo,
            ready: function () { return loaded; }, _parse: parse };
 })();

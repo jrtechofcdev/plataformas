@@ -50,7 +50,7 @@ CR.App = (function () {
     CR.Stage.refresh();
     if (rendered.tools) CR.Tools.refresh();
     CR.Memory.refresh();
-    if (document.getElementById("app").dataset.view === "settings") CR.Settings.render();
+    if (document.getElementById("app").dataset.view === "settings") CR.Settings.refreshStatus();
   }
 
   /* Botão de conexão no topo: "Conectar" quando a pedaleira não está ligada. */
@@ -108,10 +108,12 @@ CR.App = (function () {
       b.onclick = function () { if (!b.classList.contains("active")) CR.haptic(); go(b.dataset.go); };
     });
     CR.UI.init();
+    if (CR.prefs.perfMeter) CR.Perf.meter(true);
     initLock();
     CR.Stage.render();
     CR.Memory.init();
-    CR.Library.init();
+    // a Biblioteca (~700 presets) carrega logo depois do Palco aparecer, sem atrasar a abertura
+    setTimeout(function () { CR.Library.init(); }, 250);
     CR.EQ.init();
     CR.on("library", function () { CR.Stage.refresh(); CR.Memory.refresh(); });
     CR.Culto.init();

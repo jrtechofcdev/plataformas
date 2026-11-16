@@ -35,12 +35,14 @@ CR.UI = (function () {
     if (!el || el.disabled) return;
     var r = el.getBoundingClientRect();
     if (!r.width || !r.height) return;
-    var cs = getComputedStyle(el), x = e.clientX - r.left, y = e.clientY - r.top;
+    var x = e.clientX - r.left, y = e.clientY - r.top;
     var d = 2 * Math.hypot(Math.max(x, r.width - x), Math.max(y, r.height - y));
+    // desempenho: o arredondado do botão é lido uma vez só (getComputedStyle a cada toque força o navegador a recalcular)
+    if (el._br === undefined) el._br = getComputedStyle(el).borderRadius;
     var host = document.createElement("span");
     host.className = "rip-host";
-    host.style.cssText = "left:" + r.left + "px;top:" + r.top + "px;width:" + r.width + "px;height:" + r.height + "px;border-radius:" + cs.borderRadius;
-    var tint = cs.getPropertyValue("--rip").trim();
+    host.style.cssText = "left:" + r.left + "px;top:" + r.top + "px;width:" + r.width + "px;height:" + r.height + "px;border-radius:" + el._br;
+    var tint = tintOf(el);
     if (tint) host.style.setProperty("--rip", tint);
     var s = document.createElement("span");
     s.className = "rip";
@@ -49,6 +51,18 @@ CR.UI = (function () {
     document.body.appendChild(host);
     setTimeout(function () { host.remove(); }, 620);
   }, { passive: true, capture: true });
+
+  /* Cor da onda: a do LED do botão (presets, módulos, controles, atalhos), verde-água no EQ ligado,
+     branca nos botões principais e no resto. */
+  function tintOf(el) {
+    if (el.matches('.btn.primary, .nav-big.primary, .chip.connect, [aria-pressed="true"], [aria-selected="true"]')) return "";
+    if (el.matches(".eq-strip.on")) return "var(--brand)";
+    if (el.matches(".preset-btn, .module-btn, .tile, .quick-btn, .slot-btn, .step-big, .zero-btn, .tap-btn, .load-btn")) {
+      var h = el.closest('[style*="--led"]');
+      return h ? h.style.getPropertyValue("--led").trim() : "";
+    }
+    return "";
+  }
 
   /* ---------------------------------------------------------------- barra em pílula: destaque que desliza */
   /* As posições dos botões ficam guardadas (medidas só ao abrir e ao girar a tela): trocar de aba não força o
@@ -145,14 +159,14 @@ CR.UI = (function () {
     var all = Array.prototype.slice.call(scope.querySelectorAll(opts.sel || CASCADE));
     var leaves = all.filter(function (el) { return !all.some(function (o) { return o !== el && el.contains(o); }); });
     var H = window.innerHeight, n = 0;
-    leaves.forEach(function (el) {
-      if (n >= (opts.max || 14)) return;
-      var r = el.getBoundingClientRect();
-      if (!r.height || r.bottom < 0 || r.top > H) return;
+    for (var i = 0; i < leaves.length && n < (opts.max || 14); i++) {
+      var el = leaves[i], r = el.getBoundingClientRect();
+      if (r.top > H) break;                          // a lista segue de cima para baixo: o resto está fora da tela
+      if (!r.height || r.bottom < 0) continue;
       anim(el, [{ opacity: 0, transform: "translateY(" + (opts.dy || 16) + "px)" }, { opacity: 1, transform: "none" }],
         { duration: opts.dur || 380, delay: (opts.delay || 50) + n * (opts.step || 34), easing: EASE, fill: "backwards" });
       n++;
-    });
+    }
   }
 
   /* ---------------------------------------------------------------- número que rola
@@ -246,6 +260,12 @@ CR.UI = (function () {
     if (window.ResizeObserver && nav) new ResizeObserver(function () { measureNav(); moveIndicator(true); }).observe(nav);
     var d = document.getElementById("dialog");
     if (d) dragToClose(d);
+    // Com o ajuste, o EQ, o log ou uma janela por cima, o que está embaixo para de animar (classe "covered")
+    var layers = ["adjust", "eqScreen", "logPanel", "dialog"].map(function (id) { return document.getElementById(id); }).filter(Boolean);
+    function cover() { document.body.classList.toggle("covered", layers.some(function (l) { return !l.hidden; })); }
+    var mo = new MutationObserver(cover);
+    layers.forEach(function (l) { mo.observe(l, { attributes: true, attributeFilter: ["hidden"] }); });
+    cover();
   }
 
   return { init: init, lite: lite, applyMotion: applyMotion, moveIndicator: moveIndicator, switchView: switchView, cascade: cascade,
