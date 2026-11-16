@@ -57,22 +57,53 @@ CR.UI = (function () {
   function measureNav() {
     var nav = document.querySelector(".nav");
     navPos = {};
+    // a moldura fica 3 px mais larga de cada lado que o botão: o nome inteiro cabe dentro dela, longe dos cantos
+    var X = 3;
     if (nav) nav.querySelectorAll("button[data-go]").forEach(function (b) {
-      navPos[b.dataset.go] = [b.offsetLeft, b.offsetTop, b.offsetWidth, b.offsetHeight];
+      var l = Math.max(2, b.offsetLeft - X), r = Math.min(nav.clientWidth - 2, b.offsetLeft + b.offsetWidth + X);
+      navPos[b.dataset.go] = [l, b.offsetTop, r - l, b.offsetHeight];
     });
   }
+  var indAt = null, indAnim = null;
   function moveIndicator(instant) {
     var nav = document.querySelector(".nav"), ind = nav && nav.querySelector(".nav-ind"), b = nav && nav.querySelector("button.active");
     if (!ind || !b) return;
     if (!navPos || !navPos[b.dataset.go] || !navPos[b.dataset.go][2]) measureNav();
-    var q = navPos[b.dataset.go];
-    if (instant) ind.style.transition = "none";
+    var q = navPos[b.dataset.go], from = indAt;
     nav.style.setProperty("--ix", q[0] + "px");
     nav.style.setProperty("--iy", q[1] + "px");
     nav.style.setProperty("--iw", q[2] + "px");
     nav.style.setProperty("--ih", q[3] + "px");
-    if (instant) { void ind.offsetWidth; ind.style.transition = ""; }
     nav.classList.add("ready");
+    indAt = q.slice();
+    if (indAnim) { from = currentRect(ind) || from; indAnim.cancel(); indAnim = null; }
+    if (instant || !from || lite() || !ind.animate || (from[0] === q[0] && from[1] === q[1])) return;
+    indAnim = ind.animate(liquid(from, q), { duration: 520, easing: "linear" });
+    indAnim.onfinish = function () { indAnim = null; };
+  }
+  /* Onde a moldura está agora (se o dedo trocar de aba no meio do movimento, ela parte dali). */
+  function currentRect(ind) {
+    var m = getComputedStyle(ind).transform, w = ind.offsetWidth, h = ind.offsetHeight;
+    var t = m && m !== "none" ? m.match(/matrix\(([^)]+)\)/) : null;
+    if (!t) return null;
+    var v = t[1].split(",").map(Number);
+    return [v[4], v[5], w, h];
+  }
+  /* Quadros do movimento "líquido": a borda da frente corre na frente (chega rápido) e a de trás
+     vem atrás (sai devagar), então a moldura estica no caminho e encolhe ao chegar. */
+  function liquid(a, b) {
+    var vertical = a[0] === b[0], i0 = vertical ? 1 : 0, i1 = vertical ? 3 : 2, fwd = b[i0] > a[i0];
+    var lead = function (t) { return 1 - Math.pow(1 - t, 3.2); };              // sai na frente
+    var lag = function (t) { return t < .18 ? 0 : 1 - Math.pow(1 - (t - .18) / .82, 2.4); }; // espera um pouco e alcança
+    var frames = [];
+    for (var k = 0; k <= 12; k++) {
+      var t = k / 12, s0 = a[i0], e0 = a[i0] + a[i1], s1 = b[i0], e1 = b[i0] + b[i1];
+      var start = s0 + (s1 - s0) * (fwd ? lag(t) : lead(t)), end = e0 + (e1 - e0) * (fwd ? lead(t) : lag(t));
+      var x = vertical ? a[0] : start, y = vertical ? start : a[1];
+      var w = vertical ? a[2] : end - start, h = vertical ? end - start : a[3];
+      frames.push({ transform: "translate(" + x.toFixed(1) + "px, " + y.toFixed(1) + "px)", width: w.toFixed(1) + "px", height: h.toFixed(1) + "px", offset: t });
+    }
+    return frames;
   }
 
   /* ---------------------------------------------------------------- troca de aba
@@ -88,15 +119,21 @@ CR.UI = (function () {
     if (a._va) { a._va.cancel(); a._va = null; }
     a.classList.remove("active");
     if (lite()) { a.classList.remove("leaving"); return; }
+    // Deslizamento no eixo da barra: para os lados em pé; para cima/baixo com o trilho deitado.
     var dir = ORDER.indexOf(to) >= ORDER.indexOf(from) ? 1 : -1;
+    var rail = window.matchMedia && window.matchMedia("(orientation: landscape) and (max-height: 560px)").matches;
+    var dist = Math.round(Math.max(56, Math.min(110, (rail ? window.innerHeight : window.innerWidth) * .2)));
+    var mv = function (d) { return (rail ? "translateY(" : "translateX(") + d + "px)"; };
     a.classList.add("leaving");
-    var out = anim(a, [{ opacity: 1, transform: "none" }, { opacity: 0, transform: "translateX(" + (-dir * 26) + "px) scale(.99)" }],
-      { duration: 170, easing: "ease-in", fill: "forwards" });
+    // a antiga some rápido (160 ms) e a nova só começa a aparecer depois de 110 ms: as duas quase não se sobrepõem
+    var out = anim(a, [{ opacity: 1, transform: "none" }, { opacity: 0, transform: mv(-dir * dist * .5) + " scale(.94)", offset: .8 },
+                       { opacity: 0, transform: mv(-dir * dist * .6) + " scale(.93)" }],
+      { duration: 170, easing: "cubic-bezier(.3, 0, .7, 1)", fill: "forwards" });
     function done() { a.classList.remove("leaving"); if (a._va === out) { if (out) out.cancel(); a._va = null; } }
     a._va = out;
     if (out) out.onfinish = done; else done();
-    b._va = anim(b, [{ opacity: 0, transform: "translateX(" + (dir * 34) + "px)" }, { opacity: 1, transform: "none" }],
-      { duration: 340, easing: EASE });
+    b._va = anim(b, [{ opacity: 0, transform: mv(dir * dist) + " scale(.97)" }, { opacity: 1, transform: "none" }],
+      { duration: 460, delay: 110, easing: EASE, fill: "backwards" });
   }
 
   /* ---------------------------------------------------------------- entrada em cascata

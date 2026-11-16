@@ -39,8 +39,8 @@ As cores e os nomes continuam os da pedaleira, para reconhecer cada controle sem
 ## Movimento (versão 2.7)
 | Onde | O quê | Tempo |
 |---|---|---|
-| Barra de abas | destaque em pílula desliza com mola até a aba tocada | 320 ms |
-| Troca de aba | a tela nova entra deslizando do lado da aba; a antiga some | 340 / 170 ms |
+| Barra de abas | moldura de cantos arredondados "escorre" até a aba: a ponta da frente chega primeiro, a de trás alcança depois; ícone dá um pulo | 520 ms |
+| Troca de aba | a antiga encolhe e some; a nova entra deslizando do lado da aba (para cima/baixo com o trilho deitado) | 170 ms + 460 ms |
 | Listas e cartões | entram em cascata (até 14 itens, 34 ms entre eles) | 380 ms |
 | Toque | o botão afunda (96,5%) e solta uma onda de luz da cor do LED | 560 ms |
 | Tela de ajuste | nasce do controle tocado e fecha voltando para ele; setas deslizam | 320 ms |

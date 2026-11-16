@@ -31,7 +31,7 @@ button { font: inherit; color: inherit; }
 .views { grid-area: main; position: relative; overflow: hidden; }
 .nav { position: fixed; z-index: 20; left: 0; right: 0; bottom: calc(var(--nav-m) + env(safe-area-inset-bottom)); margin: 0 auto;
   width: min(620px, calc(100% - var(--nav-m) * 2 - env(safe-area-inset-left) - env(safe-area-inset-right))); height: var(--nav-h);
-  display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); padding: 5px; border-radius: 999px;
+  display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); padding: 5px; border-radius: 20px;
   background: var(--glass); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
   border: 1px solid var(--glass-line); box-shadow: var(--hl), var(--e3); }
 
@@ -44,7 +44,8 @@ button { font: inherit; color: inherit; }
   .topbar { padding: 0 calc(12px + env(safe-area-inset-right)) 0 10px; }
   .nav { position: relative; grid-area: nav; left: auto; right: auto; bottom: auto; width: auto; height: auto;
     margin: 8px 0 8px calc(8px + env(safe-area-inset-left)); grid-template-columns: none; grid-template-rows: repeat(6, minmax(0, 1fr));
-    border-radius: 30px; }
+    border-radius: 20px; }
+  .nav button { font-size: 12px; letter-spacing: 0; }
 }
 
 /* cabeçalho */
@@ -79,23 +80,28 @@ button { font: inherit; color: inherit; }
 .icon-btn.active { color: var(--warn); border-color: rgba(242, 193, 78, .45); background: rgba(242, 193, 78, .08); box-shadow: 0 0 16px -6px rgba(242, 193, 78, .7); }
 .icon-btn.holding { background: rgba(242, 193, 78, .22); transition: background 1s linear; }
 
-/* navegação: pílula com um destaque que desliza até a aba escolhida */
+/* navegação: barra flutuante com uma moldura (cantos arredondados, cantos concêntricos com a barra) que
+   "escorre" até a aba escolhida: a ponta da frente chega primeiro e a de trás alcança depois (ui.js). */
 .nav-ind { position: absolute; left: 0; top: 0; width: var(--iw, 0px); height: var(--ih, 0px); transform: translate(var(--ix, 0px), var(--iy, 0px));
-  border-radius: 999px; pointer-events: none; opacity: 0;
-  background: linear-gradient(180deg, rgba(51, 234, 184, .24), rgba(35, 200, 224, .10));
-  box-shadow: inset 0 0 0 1px rgba(51, 234, 184, .38), inset 0 1px 0 rgba(255, 255, 255, .12), 0 0 22px -6px rgba(51, 234, 184, .65);
-  transition: transform var(--dur-3) var(--ease-spring), width var(--dur-3) var(--ease-out), height var(--dur-3) var(--ease-out), opacity var(--dur-2); }
+  border-radius: 14px; pointer-events: none; opacity: 0;
+  background: linear-gradient(180deg, rgba(51, 234, 184, .26), rgba(35, 200, 224, .10));
+  box-shadow: inset 0 0 0 1px rgba(51, 234, 184, .42), inset 0 1px 0 rgba(255, 255, 255, .14), 0 0 22px -6px rgba(51, 234, 184, .7);
+  transition: opacity var(--dur-2); }
 .nav.ready .nav-ind { opacity: 1; }
 .nav button { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border: 0;
-  min-width: 0; padding: 0; border-radius: 999px; background: transparent; color: var(--muted); font: 600 12px/1.1 var(--font-label); letter-spacing: 0;
+  min-width: 0; padding: 0 2px; border-radius: 14px; background: transparent; color: var(--muted); font: 600 12px/1.1 var(--font-label); letter-spacing: 0;
   white-space: nowrap; cursor: pointer; min-height: var(--tap); transition: color var(--dur-2); }
 .nav button > span:last-child { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .nav button .ico { width: 23px; height: 23px; transition: transform var(--dur-3) var(--ease-spring), filter var(--dur-2); }
 .nav button.active { color: var(--brand); }
-.nav button.active .ico { transform: translateY(-1px) scale(1.08); filter: drop-shadow(0 0 6px rgba(51, 234, 184, .65)); }
+.nav button.active .ico { transform: translateY(-1px) scale(1.08); filter: drop-shadow(0 0 6px rgba(51, 234, 184, .65)); animation: navPop .5s var(--ease-spring); }
+.nav button.active > span:last-child { animation: navLabel .4s var(--ease-out); }
+@keyframes navPop { 0% { transform: translateY(3px) scale(.72); } 55% { transform: translateY(-3px) scale(1.18); } }
+@keyframes navLabel { from { opacity: .3; transform: translateY(3px); } }
 .nav button.active .nav-ico { position: relative; }
-@media (min-width: 400px) { .nav button { font-size: 13px; letter-spacing: .2px; } }
-@media (max-width: 380px) { .nav { padding: 4px; } .nav button { letter-spacing: -.2px; } }
+@media (min-width: 400px) { .nav button { font-size: 13px; } }
+@media (max-width: 380px) { .nav { padding: 4px; } .nav button { font-size: 11.5px; letter-spacing: -.15px; } }
+@media (max-width: 359px) { .nav button { font-size: 10.5px; padding: 0; } }
 
 /* ================================================================ telas */
 .view { position: absolute; inset: 0; display: none; }
@@ -1021,6 +1027,7 @@ button { font: inherit; color: inherit; }
 :root[data-motion="lite"] { --dur-1: 50ms; --dur-2: 90ms; --dur-3: 130ms; --ease-spring: var(--ease-out); }
 :root[data-motion="lite"] :is(.topbar, .nav, .sheet-card, .toast, .chips, .mem-tabs, .lock-shield p) { -webkit-backdrop-filter: none; backdrop-filter: none; }
 :root[data-motion="lite"] .nav { background: rgba(15, 18, 23, .96); }
+:root[data-motion="lite"] .nav button.active .ico, :root[data-motion="lite"] .nav button.active > span:last-child { animation: none; }
 :root[data-motion="lite"] .topbar { background: #0e1115; }
 :root[data-motion="lite"] .sheet-card { background: var(--sheen), #12151a; }
 :root[data-motion="lite"] .led::after { animation: none !important; }
