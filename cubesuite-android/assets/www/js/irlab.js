@@ -77,40 +77,8 @@ CR.IrLab = (function () {
     return out;
   }
 
-  /* Filtros biquad (fórmulas clássicas de Robert Bristow-Johnson). */
-  function biquad(type, f0, q, gainDb) {
-    var A = Math.pow(10, gainDb / 40), w = 2 * Math.PI * f0 / FS, cs = Math.cos(w), sn = Math.sin(w), al = sn / (2 * q);
-    var b0, b1, b2, a0, a1, a2;
-    if (type === "hp") { b0 = (1 + cs) / 2; b1 = -(1 + cs); b2 = (1 + cs) / 2; a0 = 1 + al; a1 = -2 * cs; a2 = 1 - al; }
-    else if (type === "lp") { b0 = (1 - cs) / 2; b1 = 1 - cs; b2 = (1 - cs) / 2; a0 = 1 + al; a1 = -2 * cs; a2 = 1 - al; }
-    else if (type === "peak") { b0 = 1 + al * A; b1 = -2 * cs; b2 = 1 - al * A; a0 = 1 + al / A; a1 = -2 * cs; a2 = 1 - al / A; }
-    else { // low shelf (inclinação S = 1)
-      var sq = 2 * Math.sqrt(A) * (sn / 2) * Math.SQRT2;
-      b0 = A * ((A + 1) - (A - 1) * cs + sq); b1 = 2 * A * ((A - 1) - (A + 1) * cs); b2 = A * ((A + 1) - (A - 1) * cs - sq);
-      a0 = (A + 1) + (A - 1) * cs + sq; a1 = -2 * ((A - 1) + (A + 1) * cs); a2 = (A + 1) + (A - 1) * cs - sq;
-    }
-    return [b0 / a0, b1 / a0, b2 / a0, a1 / a0, a2 / a0];
-  }
-  function filter(x, c) {
-    var y = new Array(x.length), x1 = 0, x2 = 0, y1 = 0, y2 = 0;
-    for (var i = 0; i < x.length; i++) {
-      var v = c[0] * x[i] + c[1] * x1 + c[2] * x2 - c[3] * y1 - c[4] * y2;
-      x2 = x1; x1 = x[i]; y2 = y1; y1 = v; y[i] = v;
-    }
-    return y;
-  }
-  function energy(x) { var e = 0; for (var i = 0; i < x.length; i++) e += x[i] * x[i]; return e; }
-
-  /* Corta em 512 amostras com um final suave (evita estalo no fim do IR). */
-  function fit512(x) {
-    var y = new Array(LEN), fade = 48;
-    for (var i = 0; i < LEN; i++) {
-      var v = x[i] || 0;
-      if (i >= LEN - fade) v *= 0.5 * (1 + Math.cos(Math.PI * (i - (LEN - fade)) / fade));
-      y[i] = v;
-    }
-    return y;
-  }
+  /* Filtros e resposta em frequência: js/dsp.js (compartilhado com o Equalizador). */
+  var biquad = CR.DSP.biquad, filter = CR.DSP.filter, energy = CR.DSP.energy, fit512 = CR.DSP.fit512;
 
   /* Aplica o EQ no IR de origem e devolve as 512 amostras finais. */
   function process(src, eq) {
@@ -125,15 +93,7 @@ CR.IrLab = (function () {
     return y.map(function (v) { return Math.round(v * k * 1e6) / 1e6; });
   }
 
-  /* Resposta em frequência (dB) em pontos espaçados em escala logarítmica, 40 Hz a 20 kHz. */
-  var FREQS = (function () { var f = []; for (var i = 0; i < 90; i++) f.push(40 * Math.pow(500, i / 89)); return f; })();
-  function response(x) {
-    return FREQS.map(function (f) {
-      var re = 0, im = 0, w = 2 * Math.PI * f / FS;
-      for (var n = 0; n < x.length; n++) { re += x[n] * Math.cos(w * n); im -= x[n] * Math.sin(w * n); }
-      return 20 * Math.log10(Math.sqrt(re * re + im * im) + 1e-9);
-    });
-  }
+  var FREQS = CR.DSP.FREQS, response = CR.DSP.response;
 
   /* ================================================================ desenho */
   function drawResp() {
@@ -258,7 +218,9 @@ CR.IrLab = (function () {
   async function fromSlot(i) {
     CR.busy(true, "Lendo o gabinete do slot " + (i + 2));
     try {
-      var r = await CR.native("irRead", { slot: i });
+      // com o Equalizador ativo o slot pode estar equalizado: o editor parte sempre do original
+      var o = CR.EQ && CR.EQ.original(i);
+      var r = o ? { distance: o.distance, samples: o.samples } : await CR.native("irRead", { slot: i });
       S.dist = Math.round(Math.max(0.01, Math.min(1, r.distance)) * 100);
       setSource("Gabinete do slot " + (i + 2), "Lido da pedaleira · 48 kHz · 512 amostras (de fábrica, o slot " + (i + 2) + " é " + CR.CABS[i + 1].name + ")", r.samples);
       S.slot = i;
@@ -302,7 +264,8 @@ CR.IrLab = (function () {
     try {
       await loadBackups();
       try {
-        var cur = await CR.native("irRead", { slot: slot });
+        var oe = CR.EQ && CR.EQ.original(slot);
+        var cur = oe ? { distance: oe.distance, samples: oe.samples } : await CR.native("irRead", { slot: slot });
         var d = new Date();
         S.backups.unshift({ slot: slot, date: d.toLocaleDateString("pt-BR") + " " + d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
           name: "antes de gravar " + what, distance: Math.round(cur.distance * 100), samples: cur.samples });
@@ -315,6 +278,7 @@ CR.IrLab = (function () {
       }
       CR.busy(true, "Gravando no slot " + (slot + 2));
       await CR.native("irSave", { slot: slot, samples: samples, distance: distance });
+      if (CR.EQ) CR.EQ.originalWritten(slot, samples, distance / 100);     // vira o novo original; o EQ é reaplicado por cima
       CR.toast("IR gravado no slot " + (slot + 2));
     } catch (e) { CR.toast(e.message, true); }
     finally { CR.busy(false); paint(); }

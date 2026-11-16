@@ -5,7 +5,7 @@ var CR = window.CR || (window.CR = {});
 
 CR.Settings = (function () {
   var $ = function (s, root) { return (root || document).querySelector(s); };
-  var appInfo = { version: "2.5.0" };
+  var appInfo = { version: "2.6.0" };
 
   function seg(name, options, current) {
     return '<div class="seg" role="group" data-seg="' + name + '">' + options.map(function (o) {
@@ -28,6 +28,14 @@ CR.Settings = (function () {
         seg("tunerSource", [["mic", "Microfone"], ["usb", "Entrada USB"]], p.tunerSource) +
         '<p class="hint" id="inputsHint">O microfone sempre funciona; aproxime o celular da guitarra ou do fone. A entrada USB usa o áudio da própria pedaleira: enquanto o afinador USB estiver aberto, o app pausa os controles (o Android não deixa usar o áudio e o controle pelo mesmo cabo ao mesmo tempo) e reconecta sozinho ao sair.</p>' +
         '<div class="set-row"><div><b>Referência A4</b><span>Padrão 440 Hz.</span></div><div class="stepper"><button class="step" type="button" data-a4="-1" aria-label="Diminuir A4">' + CR.icon("minus") + '</button><b id="a4Val">' + p.a4 + ' Hz</b><button class="step" type="button" data-a4="1" aria-label="Aumentar A4">' + CR.icon("plus") + "</button></div></div></article>" +
+
+      '<article class="card" id="eqCard"><header class="card-head">' + CR.icon("eq") + "<div><h2>Equalizador</h2><p>O EQ é misturado no IR CAB, o último bloco antes da saída da pedaleira. Abre pelo botão EQ do Palco.</p></div></header>" +
+        seg("eqMode", [["preset", "Por preset (A, B, C)"], ["cab", "Por gabinete"]], CR.EQ.mode()) +
+        '<p class="hint">' + (CR.EQ.mode() === "preset"
+          ? "Cada preset tem a sua curva. Com o EQ ligado, as posições 7, 8 e 9 do IR CAB ficam reservadas para A, B e C (o app guarda o gabinete que cada preset usa)."
+          : "Cada gabinete (IR CAB 2 a 9) tem a sua curva: todo preset que usar aquele gabinete leva o EQ dele.") +
+        " O app guarda os gabinetes originais e grava sozinho na pedaleira.</p>" +
+        '<button class="btn wide danger" type="button" id="eqRestore">' + CR.icon("trash") + "<span>Desligar tudo e restaurar os gabinetes originais</span></button></article>" +
 
       CR.Follow.cardHtml() +
 
@@ -52,6 +60,7 @@ CR.Settings = (function () {
       g.querySelectorAll("button").forEach(function (b) {
         b.onclick = function () {
           var key = g.dataset.seg;
+          if (key === "eqMode") { CR.EQ.setMode(b.dataset.v); render(); CR.haptic("detent"); return; }
           CR.prefs[key] = b.dataset.v;
           CR.savePrefs();
           g.querySelectorAll("button").forEach(function (x) { x.setAttribute("aria-pressed", String(x === b)); });
@@ -70,6 +79,10 @@ CR.Settings = (function () {
     $("#btnLog").onclick = openLog;
     $("#btnLearn").onclick = function () { CR.App.go("learn"); };
     CR.Follow.bindCard($("#followCard"));
+    $("#eqRestore").onclick = async function () {
+      if (!(await CR.confirm("Restaurar originais", "Desligar o EQ de todos os presets e gabinetes e regravar os gabinetes originais na pedaleira?", "Restaurar"))) return;
+      CR.EQ.restoreAll(); CR.toast("EQ desligado. Os originais são regravados em instantes."); render();
+    };
     CR.native("audioInputs").then(function (list) {
       var usb = (list || []).some(function (x) { return x.id === "usb"; });
       if (!usb) $("#inputsHint").textContent += " No momento nenhuma entrada USB de áudio foi encontrada.";

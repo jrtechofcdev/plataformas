@@ -50,6 +50,8 @@ CR.ICONS = {
   headphones: '<path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="3.5" y="14" width="4" height="6.5" rx="1"/><rect x="16.5" y="14" width="4" height="6.5" rx="1"/>',
   strobe: '<rect x="2.5" y="7" width="19" height="10" rx="1"/><path d="M6 7v10M10 7v10M14 7v10M18 7v10"/>',
   search2: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5M8 10.5h5M10.5 8v5"/>',
+  // equalizador: três sliders com puxadores em alturas diferentes
+  eq: '<path d="M6 3.5v17M12 3.5v17M18 3.5v17"/><rect x="3.5" y="13" width="5" height="3.5" rx="1"/><rect x="9.5" y="6.5" width="5" height="3.5" rx="1"/><rect x="15.5" y="10.5" width="5" height="3.5" rx="1"/>',
   culto: '<path d="M3.5 6h11M3.5 11h11M3.5 16h6"/><path d="M19.5 4v12"/><circle cx="17" cy="17" r="2.5"/>',
   boost: '<path d="M13 2.5 5 13.5h6l-1 8 8-11h-6z"/>',
   mute: '<path d="M3.5 9h4l5-4v14l-5-4h-4z"/><path d="m16 9.5 5 5M21 9.5l-5 5"/>',

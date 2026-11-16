@@ -101,6 +101,7 @@ CR.App = (function () {
     CR.Stage.render();
     CR.Memory.init();
     CR.Library.init();
+    CR.EQ.init();
     CR.on("library", function () { CR.Stage.refresh(); CR.Memory.refresh(); });
     CR.Culto.init();
     CR.Stage.showState(CR.S.status);

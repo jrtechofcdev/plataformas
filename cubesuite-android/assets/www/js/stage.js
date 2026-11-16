@@ -61,7 +61,7 @@ CR.Stage = (function () {
     if (!b) return;
     var v = CR.val(c), f = CR.format(c, v);
     b.querySelector(".t-val").textContent = f.short;
-    b.querySelector(".t-sub").textContent = c.list ? CR[c.list][v].name :
+    b.querySelector(".t-sub").textContent = c.list ? CR[c.list][v].name + (c.key === "irCab" && CR.EQ && CR.EQ.activeFor(CR.S.preset) ? " · EQ" : "") :
       (c.bipolar ? (v === c.zero ? "Desligado" : v < c.zero ? "Chorus" : "Phaser") :
        c.key === "time" && CR.Delay && CR.Delay.calibrated() ? CR.Delay.msOf(v) + " ms" : CR.prefs.display === "percent" ? "" : "de " + c.max);
     b.querySelector(".t-bar i").setAttribute("style", barStyle(c, v));
@@ -71,7 +71,26 @@ CR.Stage = (function () {
     b.setAttribute("aria-label", c.label + ", " + c.name + ": " + f.long + ". Toque para ajustar");
   }
 
+  /* Botão EQ do Palco: estado do equalizador do preset (ou do gabinete) em edição e uma mini curva. */
+  function paintEq() {
+    var b = document.getElementById("eqStrip");
+    if (!b || !CR.EQ) return;
+    var t = CR.EQ.defaultTarget(), m = CR.EQ.mode(), c = t === null ? null : CR.EQ.curve(t), on = !!(c && c.on && !(m === "cab" && CR.EQ.isFlat(c)));
+    var who = m === "preset" ? "Preset " + "ABC"[CR.S.preset] : t === null ? "Sem gabinete" : "Gabinete " + (t + 2);
+    var path = "";
+    if (c) {
+      var pts = CR.EQ.target(c).filter(function (v, i) { return i % 3 === 0; });
+      path = pts.map(function (v, i) { return (i ? "L" : "M") + (i / (pts.length - 1) * 100).toFixed(1) + " " + (14 - Math.max(-12, Math.min(12, v)) * 0.9).toFixed(1); }).join(" ");
+    }
+    b.classList.toggle("on", on);
+    b.innerHTML = '<span class="eq-strip-ico">' + CR.icon("eq") + "</span>" +
+      '<span class="eq-strip-txt"><b>EQ</b><small>' + who + " · " + (on ? "Ligado" : "Desligado") + "</small></span>" +
+      '<svg class="eq-spark" viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true"><path d="M0 14H100" class="z"/>' + (path ? '<path d="' + path + '"/>' : "") + "</svg>" +
+      CR.icon("chevron");
+  }
+
   function refresh() {
+    paintEq();
     document.querySelectorAll(".preset-btn").forEach(function (b, i) {
       b.classList.toggle("active", i === CR.S.preset);
       b.setAttribute("aria-pressed", String(i === CR.S.preset));
@@ -122,7 +141,10 @@ CR.Stage = (function () {
     if (c.list) {
       body = '<div class="slot-grid">' + CR[c.list].map(function (s, v) {
         return '<button type="button" class="slot-btn" data-v="' + v + '"><b>' + s.slot + '</b><span>' + s.name + "</span><small>" + s.kind + "</small></button>";
-      }).join("") + "</div>";
+      }).join("") + "</div>" + (c.key === "irCab" && CR.EQ && CR.EQ.mode() === "preset" && [0, 1, 2].some(function (p) { return CR.EQ.curve(p).on; })
+        ? '<p class="hint eq-cabnote">' + (CR.EQ.routed(CR.S.preset)
+            ? "EQ ligado neste preset: escolha o gabinete base e o app aplica o EQ por cima."
+            : "Com o EQ por preset ligado, as posições 7, 8 e 9 guardam o EQ de A, B e C. Prefira os gabinetes 2 a 6 neste preset.") + "</p>" : "");
     } else {
       var qv = quickValues(c);
       body = '<div class="adj-slider"></div><div class="quick' + (qv.length > 8 ? " many" : "") + '">' + qv.map(function (q) {
@@ -280,6 +302,7 @@ CR.Stage = (function () {
   window.cubeBack = function () {
     if (!$("#logPanel").hidden) { $("#logPanel").hidden = true; return true; }
     if (!$("#dialog").hidden) { $("#dialog").hidden = true; return true; }
+    if (!$("#eqScreen").hidden) { CR.EQScreen.close(); return true; }
     if (!$("#adjust").hidden) { closeAdjust(); return true; }
     var view = document.getElementById("app").dataset.view;
     if (view === "learn") { CR.App.go("settings"); return true; }      // Aprender abre a partir de Ajustes
@@ -290,6 +313,8 @@ CR.Stage = (function () {
 
   CR.on("changed", refresh);
   CR.on("memories", refresh);
+  CR.on("eq", refresh);
+  document.getElementById("eqStrip").onclick = function () { if (!CR.S.locked) CR.EQScreen.open(); };
   CR.on("playing", refresh);
   CR.on("preset", function () { if (adj.c) adj.start = CR.val(adj.c); refresh(); });
 

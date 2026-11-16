@@ -65,6 +65,7 @@ var CR = window.CR || (window.CR = {});
           case "memSave": try { localStorage.setItem(a.name ? "cr.mock." + a.name : "cr.mock.mem", a.data); } catch (_) {} break;
           case "memExport": r = "CubeRemote-memorias-simulador.json"; break;
           case "memShare": break;
+          case "haptic": (self.haptics = self.haptics || []).push(a.kind || "tap"); if (self.haptics.length > 200) self.haptics.shift(); break;
           case "fileExport":
             self.exported = self.exported || [];
             self.exported.push({ name: a.name, size: atob(a.b64).length, share: a.share, b64: a.b64 });

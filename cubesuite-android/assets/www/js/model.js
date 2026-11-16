@@ -124,7 +124,11 @@ CR.syncOnConnect = function (pedal) {
   d.querySelectorAll("[data-close]").forEach(function (b) { b.onclick = d.querySelector("[data-keep]").onclick; });
 };
 
-CR.val = function (c) { return CR.S.presets ? CR.S.presets[CR.S.preset][c.off] : c.zero; };
+CR.val = function (c) {
+  if (!CR.S.presets) return c.zero;
+  var v = CR.S.presets[CR.S.preset][c.off];
+  return c.off === 9 && CR.EQ ? CR.EQ.cabFor(CR.S.preset, v) : v;      // EQ por preset: mostra o gabinete base
+};
 CR.isActive = function (c) { return CR.val(c) !== c.zero; };
 CR.moduleOn = function (m) { return CR.S.presets ? !!CR.S.presets[CR.S.preset][m.off] : true; };
 
@@ -174,6 +178,8 @@ CR.format = function (c, v) {
 /* Muda um byte do preset em edição: atualiza tela, guarda desfazer e envia. */
 CR.set = function (offset, value, opts) {
   if (!CR.S.presets || CR.S.locked) return false;
+  // EQ por preset ligado: o IR CAB da pedaleira aponta para o slot do EQ; mudar o gabinete muda a base
+  if (offset === 9 && CR.EQ && CR.EQ.routed(CR.S.preset)) return CR.EQ.setBase(CR.S.preset, value);
   var p = CR.S.presets[CR.S.preset], prev = p[offset];
   if (prev === value) return false;
   if (!(opts && opts.noUndo)) {
@@ -263,7 +269,18 @@ CR.prefs = Object.assign({ display: "steps", tuning: "std", tunerView: "needle",
                          CR.store.get("cr.prefs", {}));
 CR.savePrefs = function () { CR.store.set("cr.prefs", CR.prefs); };
 
-CR.haptic = function () { if (CR.prefs.haptics) CR.native("haptic").catch(function () {}); };
+/* Vibração: "tap" (toque comum), "tick" (cada passo de um slider ou knob), "detent" (marca: 0 dB, ligar/desligar).
+   No máximo uma a cada 25 ms, para não embolar quando o dedo corre rápido. */
+CR.haptic = (function () {
+  var last = 0;
+  return function (kind) {
+    if (!CR.prefs.haptics) return;
+    var now = Date.now();
+    if (now - last < 25 && kind !== "detent") return;
+    last = now;
+    CR.native("haptic", { kind: kind || "tap" }).catch(function () {});
+  };
+})();
 
 /* ---------------------------------------------------------------- avisos */
 (function () {

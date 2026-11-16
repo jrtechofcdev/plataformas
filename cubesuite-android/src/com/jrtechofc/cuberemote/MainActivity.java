@@ -59,7 +59,7 @@ import java.util.concurrent.TimeUnit;
  * Tudo é registrado no log (AppLog), visível em Ajustes > Log.
  */
 public class MainActivity extends Activity {
-    static final String VERSION = "2.5.0";
+    static final String VERSION = "2.6.0";
     private static final int PICK_FILE = 41;
     private static final String ACTION_USB_PERMISSION = "com.jrtechofc.cuberemote.USB_PERMISSION";
 
@@ -947,8 +947,15 @@ public class MainActivity extends Activity {
                 case "setOrientation":
                     try { applyOrientation(new JSONObject(argsJson).optString("mode", "auto")); } catch (Exception ignored) {}
                     resolve(id, true, "null"); return;
-                case "haptic":
-                    main.post(() -> web.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP));
+                case "haptic": {
+                    // tick: cada passo de slider/knob; detent: marca (0 dB, liga/desliga); tap: toque comum
+                    String kind = "tap";
+                    try { kind = new JSONObject(argsJson).optString("kind", "tap"); } catch (Exception ignored) {}
+                    final int fb = "tick".equals(kind) ? HapticFeedbackConstants.CLOCK_TICK
+                            : "detent".equals(kind) ? (Build.VERSION.SDK_INT >= 30 ? HapticFeedbackConstants.CONFIRM : HapticFeedbackConstants.VIRTUAL_KEY)
+                            : HapticFeedbackConstants.KEYBOARD_TAP;
+                    main.post(() -> web.performHapticFeedback(fb));
+                }
                     resolve(id, true, "null"); return;
                 case "appInfo":
                     resolve(id, true, "{\"version\":" + JSONObject.quote(VERSION) + ",\"android\":"
@@ -1069,7 +1076,7 @@ public class MainActivity extends Activity {
     private static String storeName(String argsJson) {
         try {
             String n = new JSONObject(argsJson).optString("name");
-            return "setlist".equals(n) || "irbak".equals(n) || "biblioteca".equals(n) ? n : "memorias";
+            return "setlist".equals(n) || "irbak".equals(n) || "biblioteca".equals(n) || "eq".equals(n) || "eqorig".equals(n) ? n : "memorias";
         }
         catch (Exception e) { return "memorias"; }
     }

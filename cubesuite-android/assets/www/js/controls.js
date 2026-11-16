@@ -77,4 +77,161 @@ var CR = window.CR || (window.CR = {});
     b.addEventListener("click", function () { if (!CR.S.locked) onChange(); });
     return b;
   };
+
+  /* ---------------------------------------------------------------- SLIDER VERTICAL (equalizador, estilo Poweramp)
+     o: { label, min, max, step, value, def, tick, fmt(v), onInput(v), onCommit(v) }
+     Arrastar na vertical mexe (macio, relativo ao toque); arrastar na horizontal deixa a lista rolar.
+     Toque duplo volta ao padrão. Vibra a cada "tick" e marca o padrão (0 dB) com uma vibração mais firme. */
+  CR.makeVSlider = function (o) {
+    var el = document.createElement("div");
+    el.className = "vs";
+    el.tabIndex = 0;
+    el.setAttribute("role", "slider");
+    el.setAttribute("aria-label", o.aria || o.label);
+    el.setAttribute("aria-orientation", "vertical");
+    el.innerHTML = '<div class="vs-area"><div class="vs-rail"></div><div class="vs-fill"></div><div class="vs-thumb"><i></i></div></div>' +
+      '<b class="vs-label"></b><span class="vs-val"></span>';
+    el.querySelector(".vs-label").textContent = o.label;
+    var area = el.querySelector(".vs-area"), val = el.querySelector(".vs-val");
+    var v = o.value, def = o.def === undefined ? 0 : o.def, step = o.step || 0.1, tick = o.tick || 0.5;
+    function q(x) { return Math.round(Math.max(o.min, Math.min(o.max, x)) / step) * step; }
+    function draw() {
+      var t = (v - o.min) / (o.max - o.min);
+      el.style.setProperty("--t", t.toFixed(4));
+      el.style.setProperty("--c", "hsl(" + Math.round(172 - 78 * t) + " 88% 52%)");
+      val.textContent = o.fmt ? o.fmt(v) : v.toFixed(1).replace(".", ",");
+      el.setAttribute("aria-valuenow", v.toFixed(1));
+      el.setAttribute("aria-valuetext", val.textContent);
+      el.classList.toggle("at-def", Math.abs(v - def) < step / 2);
+    }
+    function setV(nv, fromUser) {
+      nv = q(nv);
+      if (Math.abs(nv - v) < 1e-9) return;
+      var crossedDef = (v - def) * (nv - def) <= 0 && nv !== v;
+      var tickChanged = Math.floor((v + 1e-9) / tick) !== Math.floor((nv + 1e-9) / tick);
+      v = nv; draw();
+      if (fromUser) {
+        if (crossedDef && Math.abs(nv - def) < step / 2) CR.haptic("detent");
+        else if (tickChanged) CR.haptic("tick");
+        if (o.onInput) o.onInput(v);
+      }
+    }
+    var st = null, lastUp = 0;
+    el.addEventListener("pointerdown", function (e) {
+      if (CR.S.locked) return;
+      st = { x: e.clientX, y: e.clientY, v: v, h: area.getBoundingClientRect().height - 64, drag: false, id: e.pointerId, moved: false };
+    });
+    el.addEventListener("pointermove", function (e) {
+      if (!st) return;
+      var dx = e.clientX - st.x, dy = e.clientY - st.y;
+      if (!st.drag) {
+        if (Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) { st = null; return; }     // é rolagem lateral
+        if (Math.abs(dy) < 4) return;
+        st.drag = true; st.y = e.clientY; dy = 0;
+        try { el.setPointerCapture(st.id); } catch (_) {}
+        el.classList.add("dragging");
+      }
+      e.preventDefault();
+      st.moved = true;
+      var nv = st.v - dy / Math.max(80, st.h) * (o.max - o.min);
+      if (Math.abs(nv - def) < 0.25) nv = def;                      // "imã" suave no padrão
+      setV(nv, true);
+    });
+    function end() {
+      if (!st) return;
+      var wasDrag = st.drag;
+      st = null;
+      el.classList.remove("dragging");
+      if (wasDrag) { if (o.onCommit) o.onCommit(v); return; }
+      var now = Date.now();
+      if (now - lastUp < 320) { setV(def, true); CR.haptic("detent"); if (o.onCommit) o.onCommit(v); lastUp = 0; }
+      else lastUp = now;
+    }
+    el.addEventListener("pointerup", end);
+    el.addEventListener("pointercancel", function () { st = null; el.classList.remove("dragging"); });
+    el.addEventListener("keydown", function (e) {
+      var d = { ArrowUp: step, ArrowDown: -step, PageUp: 1, PageDown: -1 }[e.key];
+      if (d) { e.preventDefault(); setV(v + d, true); if (o.onCommit) o.onCommit(v); }
+    });
+    el.set = function (nv) { v = q(nv); draw(); };
+    el.get = function () { return v; };
+    draw();
+    return el;
+  };
+
+  /* ---------------------------------------------------------------- KNOB GRANDE (estilo Poweramp)
+     o: { label, min, max, step, value, def, tick, arc (arco verde do mínimo até o valor), fmt(v), onInput, onCommit }
+     Arrastar para cima ou para a direita aumenta; toque duplo volta ao padrão. */
+  CR.makeBigKnob = function (o) {
+    var el = document.createElement("div");
+    el.className = "bk" + (o.arc ? " with-arc" : "");
+    el.tabIndex = 0;
+    el.setAttribute("role", "slider");
+    el.setAttribute("aria-label", o.label);
+    function polar(r, deg) { var a = (deg - 90) * Math.PI / 180; return [50 + r * Math.cos(a), 50 + r * Math.sin(a)]; }
+    function arcPath(r, a0, a1) {
+      if (a1 - a0 < 0.5) a1 = a0 + 0.5;
+      var p0 = polar(r, a0), p1 = polar(r, a1);
+      return "M" + p0[0].toFixed(2) + " " + p0[1].toFixed(2) + " A" + r + " " + r + " 0 " + (a1 - a0 > 180 ? 1 : 0) + " 1 " + p1[0].toFixed(2) + " " + p1[1].toFixed(2);
+    }
+    el.innerHTML = '<div class="bk-dial">' +
+      (o.arc ? '<svg class="bk-arc" viewBox="0 0 100 100" aria-hidden="true"><path class="bk-arc-val"/></svg>' : "") +
+      '<div class="bk-face"><i class="bk-dot"></i></div></div>' +
+      '<div class="bk-text"><b></b><span></span></div>';
+    el.querySelector(".bk-text b").textContent = o.label;
+    var face = el.querySelector(".bk-face"), txt = el.querySelector(".bk-text span"), arc = el.querySelector(".bk-arc-val");
+    var v = o.value, def = o.def === undefined ? o.min : o.def, step = o.step || 1, tick = o.tick || step;
+    function q(x) { return Math.round(Math.max(o.min, Math.min(o.max, x)) / step) * step; }
+    function draw() {
+      var t = (v - o.min) / (o.max - o.min), ang = -135 + 270 * t;
+      face.style.transform = "rotate(" + ang.toFixed(1) + "deg)";
+      if (arc) arc.setAttribute("d", arcPath(47, -135, ang));
+      txt.textContent = o.fmt ? o.fmt(v) : String(v);
+      el.setAttribute("aria-valuenow", String(v));
+      el.setAttribute("aria-valuetext", txt.textContent);
+    }
+    function setV(nv, fromUser) {
+      nv = q(nv);
+      if (nv === v) return;
+      var crossed = (v - def) * (nv - def) <= 0;
+      var tk = Math.floor(v / tick) !== Math.floor(nv / tick);
+      v = nv; draw();
+      if (fromUser) {
+        if (crossed && nv === def) CR.haptic("detent"); else if (tk) CR.haptic("tick");
+        if (o.onInput) o.onInput(v);
+      }
+    }
+    var st = null, lastUp = 0;
+    el.addEventListener("pointerdown", function (e) {
+      if (CR.S.locked) return;
+      e.preventDefault();
+      try { el.setPointerCapture(e.pointerId); } catch (_) {}
+      st = { x: e.clientX, y: e.clientY, v: v, drag: false };
+    });
+    el.addEventListener("pointermove", function (e) {
+      if (!st) return;
+      var d = (e.clientX - st.x) - (e.clientY - st.y);
+      if (!st.drag && Math.abs(d) < 5) return;
+      if (!st.drag) { st.drag = true; st.x = e.clientX; st.y = e.clientY; d = 0; el.classList.add("dragging"); }
+      setV(st.v + d / 240 * (o.max - o.min), true);
+    });
+    function end() {
+      if (!st) return;
+      var wasDrag = st.drag;
+      st = null; el.classList.remove("dragging");
+      if (wasDrag) { if (o.onCommit) o.onCommit(v); return; }
+      var now = Date.now();
+      if (now - lastUp < 320) { setV(def, true); CR.haptic("detent"); if (o.onCommit) o.onCommit(v); lastUp = 0; }
+      else lastUp = now;
+    }
+    el.addEventListener("pointerup", end);
+    el.addEventListener("pointercancel", function () { st = null; el.classList.remove("dragging"); });
+    el.addEventListener("keydown", function (e) {
+      var d = { ArrowUp: step, ArrowRight: step, ArrowDown: -step, ArrowLeft: -step }[e.key];
+      if (d) { e.preventDefault(); setV(v + d, true); if (o.onCommit) o.onCommit(v); }
+    });
+    el.set = function (nv) { v = q(nv); draw(); };
+    draw();
+    return el;
+  };
 })();

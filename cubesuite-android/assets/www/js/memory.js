@@ -91,7 +91,7 @@ CR.Memory = (function () {
   /* true quando o som da memória é igual ao preset p da pedaleira (bytes 0 a 12) */
   function sameAs(values, p) {
     if (!CR.S.presets) return false;
-    var cur = CR.S.presets[p];
+    var cur = CR.EQ ? CR.EQ.realValues(p) : CR.S.presets[p];
     for (var i = 0; i <= 12; i++) if (cur[i] !== values[i]) return false;
     return true;
   }
@@ -276,7 +276,7 @@ CR.Memory = (function () {
     if (CR.S.locked) { CR.toast("Controles travados. Segure o cadeado para destravar."); return; }
     if (!CR.S.presets) return;
     if (CR.Live && CR.Live.active()) { CR.toast("Desligue Boost, Mudo ou Fade na aba Culto antes de guardar, para não salvar o volume alterado.", true); return; }
-    var v = CR.S.presets[p], old = data.slots[i];
+    var v = CR.EQ ? CR.EQ.realValues(p) : CR.S.presets[p], old = data.slots[i];
     CR.dialog(CR.MODULES[p].color, "Guardar na memória " + (i + 1), "Som atual do preset " + LETTERS[p],
       '<p class="mem-preview">' + CR.esc(summary(v)) + "</p>" + mods(v) +
       nameField(old ? old.name : "", "Ex.: Louvor limpo, Solo, Ministração") +

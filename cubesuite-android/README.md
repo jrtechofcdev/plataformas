@@ -4,7 +4,7 @@ App Android para controlar a pedaleira **Cube Baby** pelo cabo USB (OTG), em tem
 em pé ou deitado. Criado do zero por José Renato (Jr_Tech_OFC).
 © 2026 José Renato · Jr_Tech_OFC. Todos os direitos reservados (veja `LICENSE`).
 
-## Funções (versão 2.5)
+## Funções (versão 2.6)
 Feito para mexer rápido e com precisão durante o culto, com botões grandes.
 - **Palco** (tela principal, nunca rola):
   - **Presets A, B, C** em botões grandes (LED verde, azul, vermelho, como na pedaleira).
@@ -22,6 +22,21 @@ Feito para mexer rápido e com precisão durante o culto, com botões grandes.
   - TYPE e IR CAB: os 9 modelos com número e nome do manual, escolha com um toque.
   - "O que é": explicação rápida e atalho para a aba Aprender.
   - O botão Voltar do Android fecha a tela de ajuste.
+- **Funciona sem a pedaleira**: todas as telas e controles ficam liberados. Os presets ficam no app
+  (última cópia conhecida, ou os de fábrica); o que você mexer sem a pedaleira fica pendente e, ao
+  conectar, o app pergunta se envia. O botão **Conectar** fica no topo. Ações ao vivo, medição do
+  delay e pesquisa do footswitch continuam precisando da pedaleira.
+- **Equalizador** (botão EQ no Palco), estilo player de música: Pré-amp + 10 bandas afinadas para
+  guitarra (80, 125, 250, 500, 800 Hz, 1.2K, 2K, 3.2K, 5K, 8K), ±12 dB em passos de 0,1 dB, sliders
+  verticais macios com vibração a cada 0,5 dB e marca no 0, toque duplo zera, curva real, knobs
+  Grave e Agudo (±9 dB), knob de Volume, predefinições (Plana, Igreja, Mais presença, Menos
+  estridente, Mais corpo, Solo cantado, Violão) e as suas.
+  - Funciona **dentro da pedaleira**: a curva é misturada no IR CAB, o último bloco antes da saída
+    (vale para fone, OUT e mesa). Prévia na hora e gravação automática 2,5 s depois do ajuste.
+  - Dois modos (Ajustes > Equalizador): **Por preset (A, B, C)** (as posições 7, 8 e 9 do IR CAB
+    ficam reservadas e o app guarda o gabinete de cada preset) ou **Por gabinete** (cada IR CAB 2 a 9
+    com a sua curva). Os gabinetes originais ficam guardados; "Desligar tudo e restaurar" regrava.
+  - Compressor e limitador não existem na pedaleira, por isso não há.
 - **Culto** (a tela para usar durante o culto):
   - **Setlist**: até 40 músicas na ordem, com tom, BPM, anotações e o som de A, B e C de cada
     uma (memórias ou fábrica, ou "manter como está"). **Próxima** e **Anterior** carregam os
@@ -79,7 +94,7 @@ Feito para mexer rápido e com precisão durante o culto, com botões grandes.
 - Desfazer e **trava de palco** (segurar o cadeado 1 s para destravar) no topo.
 
 ## Instalar
-1. Copie `CubeRemote-2.5.0.apk` para o celular e abra (permita "fontes desconhecidas").
+1. Copie `CubeRemote-2.6.0.apk` para o celular e abra (permita "fontes desconhecidas").
    Instala por cima das versões anteriores (mesma chave de assinatura).
 2. Ligue a pedaleira com cabo USB + adaptador OTG. O app conecta sozinho.
 3. Na primeira vez que abrir o afinador, permita o uso do microfone.
@@ -95,7 +110,7 @@ IR CAB e os módulos 1, 2 e 3 nos bytes 10, 11 e 12.
 ## Gerar o APK (sem Android Studio)
 ```bash
 sdkmanager "platforms;android-34" "build-tools;35.0.0"
-ANDROID_HOME=~/android-sdk ./build.sh        # gera dist/CubeRemote-2.5.0.apk
+ANDROID_HOME=~/android-sdk ./build.sh        # gera dist/CubeRemote-2.6.0.apk
 ```
 A assinatura usa `~/.cuberemote.jks`. Guarde esse arquivo: sem ele, uma versão nova não instala por cima.
 
@@ -115,6 +130,9 @@ cubesuite-android/
 │   ├── js/sounds.js          sons prontos para o culto (edite aqui)
 │   ├── js/library.js         Biblioteca: importação em lote (.zip/.json) e categorias
 │   ├── js/exporter.js        exportar presets (.json ou .zip)
+│   ├── js/dsp.js             filtros e resposta de frequência (EQ e Editor de IR)
+│   ├── js/eq.js              equalizador: modos, originais, prévia e gravação
+│   ├── js/eqscreen.js        tela do equalizador
 │   ├── js/setlist.js         aba Culto (setlist e pedal Bluetooth)
 │   ├── js/live.js            Boost, Mudo, Swell e Fade out
 │   ├── js/irlab.js           editor de IR
