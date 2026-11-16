@@ -86,7 +86,7 @@ CR.Delay = (function () {
   var run = null;
 
   async function measure() {
-    if (!CR.S.presets) { CR.toast("Conecte a pedaleira primeiro", true); return; }
+    if (!CR.S.connected) { CR.toast("A medição precisa da pedaleira. Toque em Conectar no topo.", true); return; }
     if (CR.S.locked) { CR.toast("Controles travados. Segure o cadeado para destravar."); return; }
     if (!(await CR.confirm("Medir o delay",
       "Vai levar uns 2 minutos. Deixe o som da pedaleira saindo perto do celular (amplificador, caixa ou o fone encostado no microfone). " +

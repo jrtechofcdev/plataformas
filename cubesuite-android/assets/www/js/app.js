@@ -28,21 +28,30 @@ CR.App = (function () {
 
   /* ---------------------------------------------------------------- conexão */
   function applyStatus(st) {
+    var was = CR.S.connected;
     CR.S.status = st;
-    if (st.state === "on" && st.presets) CR.S.presets = st.presets;
+    CR.S.connected = st.state === "on" && !!st.presets;
     if (st.factory) CR.S.factory = st.factory;
-    if (st.state !== "on") CR.S.presets = null;
-    var chip = $("#btnStatus");
-    chip.className = "chip " + (st.state === "on" ? (st.mock ? "sim" : "on") : st.state === "search" || st.state === "tuner" || st.state === "ensaio" ? "search" : "off");
-    chip.querySelector("span").textContent = st.state === "on" ? (st.mock ? "Simulação" : "Conectada") : st.state === "search" ? "Procurando" :
-      st.state === "tuner" ? "Afinador USB" : st.state === "ensaio" ? "Modo ensaio" : "Desconectada";
+    if (CR.S.connected) { if (!was) CR.syncOnConnect(st.presets); else { CR.S.presets = st.presets; CR.saveCache(); } }
+    paintChip(st);
     if (st.warning) CR.toast(st.warning, true);
+    if (st.state === "off" && st.message && st.message !== "Desconectada" && st.message !== "Simulador desligado")
+      CR.toast(st.message.replace(/\n/g, " ") + (/Log/.test(st.message) ? "" : " Toque em Conectar no topo para tentar de novo."), true);
+    if (st.state === "on" && !st.presets && st.generation !== 2) CR.toast("Esta Cube Baby é da geração antiga: os presets não são editáveis. Use Ferramentas para os IRs.", true);
     CR.Stage.showState(st);
-    if (CR.S.presets) CR.Stage.refresh();
-    else CR.Stage.closeAdjust();
+    CR.Stage.refresh();
     if (rendered.tools) CR.Tools.refresh();
     CR.Memory.refresh();
     if (document.getElementById("app").dataset.view === "settings") CR.Settings.render();
+  }
+
+  /* Botão de conexão no topo: "Conectar" quando a pedaleira não está ligada. */
+  function paintChip(st) {
+    var chip = $("#btnStatus"), s = st.state;
+    chip.className = "chip " + (s === "on" ? (st.mock ? "sim" : "on") : s === "search" || s === "tuner" || s === "ensaio" ? "search" : "connect");
+    chip.innerHTML = (s === "off" ? CR.icon("plug") : '<i class="dot"></i>') + "<span>" + (s === "on" ? (st.mock ? "Simulação" : "Conectada") : s === "search" ? "Procurando" :
+      s === "tuner" ? "Afinador USB" : s === "ensaio" ? "Modo ensaio" : "Conectar") + "</span>";
+    chip.setAttribute("aria-label", s === "on" ? "Pedaleira conectada: abrir conexão em Ajustes" : s === "off" ? "Conectar a pedaleira" : "Estado da conexão");
   }
 
   /* ---------------------------------------------------------------- trava de palco */
@@ -79,8 +88,14 @@ CR.App = (function () {
     $("#btnUndo").innerHTML = CR.icon("undo");
     $("#btnUndo").onclick = function () { if (!CR.S.locked) CR.undo(); };
     $("#btnStatus").onclick = function () {
-      if (CR.S.status.state === "on") go("settings"); else CR.native("connect");
+      var s = CR.S.status.state;
+      if (s === "on") go("settings");
+      else if (s === "search") CR.toast("Procurando a pedaleira. Se demorar, veja Ajustes > Abrir log.");
+      else if (s === "ensaio") CR.native("ensaioStop");
+      else if (s === "tuner") go("tuner");
+      else { CR.haptic(); CR.native("connect"); }
     };
+    paintChip(CR.S.status);
     document.querySelectorAll(".nav button").forEach(function (b) { b.onclick = function () { go(b.dataset.go); }; });
     initLock();
     CR.Stage.render();

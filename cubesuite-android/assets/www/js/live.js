@@ -16,7 +16,7 @@ CR.Live = (function () {
 
   function saveCfg() { CR.store.set("cr.live", cfg); }
   function ready(force) {
-    if (!CR.S.presets) { CR.toast("Conecte a pedaleira primeiro", true); return false; }
+    if (!CR.S.connected) { CR.toast("As ações ao vivo precisam da pedaleira. Toque em Conectar no topo.", true); return false; }
     if (CR.S.locked && !force) { CR.toast("Controles travados. Segure o cadeado para destravar."); return false; }
     return true;
   }
@@ -153,7 +153,7 @@ CR.Live = (function () {
       if (id === "mute" && muted) sub = "Sem som. Toque para voltar";
       if (anim && anim.kind === id) sub = id === "swell" ? "Subindo o volume" : "Baixando o volume";
       b.querySelector(".live-sub").textContent = sub;
-      b.disabled = !CR.S.presets;
+      b.disabled = !CR.S.connected;
     });
   }
 

@@ -228,7 +228,7 @@ CR.Library = (function () {
       '<div class="seg lib-status" role="group">' + STATUS.map(function (s) { return '<button type="button" data-st="' + s[0] + '" aria-pressed="' + (ui.status === s[0]) + '">' + s[1] + "</button>"; }).join("") + "</div>" +
       '<label class="field lib-sort"><span class="field-head"><span>Ordenar</span></span><select class="text-input" id="libSort">' +
         [["likes", "Mais curtidos"], ["new", "Mais recentes"], ["name", "Nome (A a Z)"]].map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === ui.sort ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + "</select></label>" +
-      '<div class="lib-countrow"><p class="lib-count">' + r.list.length + " preset(s) nesta visão" + (CR.S.presets ? "" : ". Conecte a pedaleira para testar.") + "</p>" +
+      '<div class="lib-countrow"><p class="lib-count">' + r.list.length + " preset(s) nesta visão" + (CR.S.connected ? "" : ". Sem a pedaleira, o teste fica guardado no app.") + "</p>" +
         '<button class="btn" type="button" id="libExport"' + (r.list.length ? "" : " disabled") + ">" + CR.icon("share") + "<span>Exportar estes " + r.list.length + "</span></button></div>" +
       '<div class="lib-list">' + r.list.slice(0, ui.shown).map(card).join("") + "</div>" +
       (r.list.length > ui.shown ? '<button class="btn wide big" type="button" id="libMore">Mostrar mais (' + (r.list.length - ui.shown) + " restantes)</button>" : "") +

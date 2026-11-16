@@ -147,7 +147,7 @@ CR.Culto = (function () {
     }
     var y = view.scrollTop;
     view.innerHTML = '<div class="page culto-page">' +
-      (CR.S.presets ? "" : '<p class="mem-warn">Conecte a pedaleira para carregar músicas e usar as ações ao vivo. A setlist pode ser montada mesmo sem ela.</p>') +
+
       '<div class="culto-top">' + nowHtml() +
         '<section class="live-wrap"><h2 class="mem-sec">Ao vivo</h2><p class="mem-sub">Age nos 3 presets, então funciona em qualquer footswitch.</p>' + CR.Live.padHtml() + "</section></div>" +
       '<article class="card"><header class="card-head">' + CR.icon("culto") + '<div><h2 id="slName">' + CR.esc(data.name) + "</h2><p>" + data.songs.length + " de " + MAX_SONGS + " músicas</p></div>" +

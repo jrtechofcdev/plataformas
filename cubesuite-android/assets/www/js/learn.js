@@ -98,16 +98,12 @@ CR.Learn = (function () {
   }
 
   async function applyRecipe(r) {
-    if (!CR.S.presets) { CR.toast("Conecte a pedaleira para aplicar", true); return; }
     if (CR.S.locked) { CR.toast("Destrave os controles primeiro", true); return; }
     var name = CR.MODULES[CR.S.preset].fs;
-    var prev = CR.S.presets[CR.S.preset].slice();
     var bytes = CR.recipeBytes(r);
     CR.busy(true, "Aplicando no preset " + name);
     try {
-      CR.S.presets = await CR.native("sendPreset", { preset: CR.S.preset, values: bytes });
-      for (var i = 0; i < 13; i++) if (prev[i] !== bytes[i]) CR.S.undo.push({ preset: CR.S.preset, offset: i, prev: prev[i], t: 0 });
-      CR.emit("preset", CR.S.preset);
+      await CR.applyValues(CR.S.preset, bytes);
       CR.toast(r.name + " aplicado no preset " + name);
     } catch (e) { CR.toast(e.message, true); }
     finally { CR.busy(false); }

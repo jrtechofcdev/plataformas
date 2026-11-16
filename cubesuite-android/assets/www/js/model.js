@@ -55,12 +55,73 @@ CR.byKey = {};
 CR.CONTROLS.forEach(function (c) { CR.byKey[c.key] = c; });
 
 /* ---------------------------------------------------------------- estado */
+/* Presets de fábrica da Cube Baby (usados quando o app nunca viu a pedaleira). */
+CR.FACTORY_DEFAULT = [[2, 4, 10, 4, 31, 38, 31, 19, 7, 8, 1, 1, 1, 0, 0, 0],
+                      [6, 3, 10, 0, 31, 12, 31, 16, 7, 8, 1, 1, 1, 0, 0, 0],
+                      [0, 5, 11, 0, 31, 32, 31, 19, 7, 8, 1, 1, 1, 0, 0, 0]];
+
+/* O app funciona com ou sem a pedaleira. Os presets ficam sempre no app (última cópia conhecida,
+   ou os de fábrica). Sem a pedaleira, o que você mexe fica "pendente" (dirty) e, ao conectar,
+   o app pergunta se envia para ela (CR.syncOnConnect). */
 CR.S = {
   status: { state: "off", message: "" },
   presets: null,          // [3][16]
+  connected: false,       // true só com a pedaleira conectada e respondendo
+  dirty: {},              // presets mexidos sem a pedaleira: { 0: true, 2: true }
   preset: 0,              // preset em edição (0 = A)
   locked: false,
   undo: [],
+};
+(function () {
+  try {
+    var c = JSON.parse(localStorage.getItem("cr.lastPresets") || "null");
+    if (Array.isArray(c) && c.length === 3 && c.every(function (r) { return Array.isArray(r) && r.length === 16; })) CR.S.presets = c;
+    CR.S.dirty = JSON.parse(localStorage.getItem("cr.dirty") || "{}") || {};
+  } catch (e) {}
+  if (!CR.S.presets) CR.S.presets = CR.FACTORY_DEFAULT.map(function (r) { return r.slice(); });
+})();
+CR.saveCache = (function () {
+  var t = null;
+  return function () {
+    clearTimeout(t);
+    t = setTimeout(function () {
+      try { localStorage.setItem("cr.lastPresets", JSON.stringify(CR.S.presets)); localStorage.setItem("cr.dirty", JSON.stringify(CR.S.dirty)); } catch (e) {}
+    }, 300);
+  };
+})();
+CR.markDirty = (function () {
+  var told = false;
+  return function (p) {
+    CR.S.dirty[p] = true;
+    CR.saveCache();
+    if (!told) { told = true; CR.toast("Sem a pedaleira: os ajustes ficam guardados no app e vão para ela quando você conectar."); }
+  };
+})();
+
+/* Conectou: se há ajustes feitos sem a pedaleira, pergunta se envia; senão usa os da pedaleira. */
+CR.syncOnConnect = function (pedal) {
+  var list = Object.keys(CR.S.dirty).map(Number).filter(function (p) { return p >= 0 && p <= 2; });
+  if (!list.length) { CR.S.presets = pedal; CR.saveCache(); return; }
+  var local = CR.S.presets;
+  CR.S.presets = pedal;
+  var names = list.map(function (p) { return "ABC"[p]; }).join(", ");
+  CR.dialog("green", "Ajustes feitos sem a pedaleira", "Preset" + (list.length > 1 ? "s " : " ") + names,
+    "<p>Você mexeu " + (list.length > 1 ? "nos presets " : "no preset ") + names + " enquanto a pedaleira estava desconectada. O que fazer?</p>" +
+    '<div class="dialog-actions"><button class="btn big" type="button" data-keep>Usar os da pedaleira</button>' +
+    '<button class="btn primary big" type="button" data-send>' + CR.icon("send") + "<span>Enviar para ela</span></button></div>");
+  var d = document.getElementById("dialog");
+  d.querySelector("[data-keep]").onclick = function () { d.hidden = true; CR.S.dirty = {}; CR.saveCache(); CR.emit("preset", CR.S.preset); };
+  d.querySelector("[data-send]").onclick = async function () {
+    d.hidden = true;
+    CR.busy(true, "Enviando para a pedaleira");
+    try {
+      for (var i = 0; i < list.length; i++) CR.S.presets = await CR.native("sendPreset", { preset: list[i], values: local[list[i]] });
+      CR.S.dirty = {};
+      CR.toast("Ajustes enviados para a pedaleira");
+    } catch (e) { CR.toast(e.message, true); }
+    finally { CR.busy(false); CR.saveCache(); CR.emit("preset", CR.S.preset); }
+  };
+  d.querySelectorAll("[data-close]").forEach(function (b) { b.onclick = d.querySelector("[data-keep]").onclick; });
 };
 
 CR.val = function (c) { return CR.S.presets ? CR.S.presets[CR.S.preset][c.off] : c.zero; };
@@ -92,6 +153,8 @@ CR.format = function (c, v) {
 (function () {
   var sending = new Map();
   CR.sendByte = function (preset, offset, value) {
+    CR.saveCache();
+    if (!CR.S.connected) { CR.markDirty(preset); return; }     // sem a pedaleira: fica no app
     var k = preset + ":" + offset, s = sending.get(k);
     if (!s) { s = { running: false, next: null }; sending.set(k, s); }
     s.next = value;
@@ -134,7 +197,10 @@ CR.applyValues = async function (preset, values, opts) {
   if (CR.S.locked && !(opts && opts.force)) throw new Error("Controles travados");
   var cur = CR.S.presets[preset].slice(), next = cur.slice();
   for (var i = 0; i <= 12; i++) next[i] = values[i];
-  CR.S.presets = await CR.native("sendPreset", { preset: preset, values: next });
+  if (CR.EQ && CR.EQ.routeValues) next = CR.EQ.routeValues(preset, next);    // EQ por preset: gabinete base
+  if (CR.S.connected) CR.S.presets = await CR.native("sendPreset", { preset: preset, values: next });
+  else { CR.S.presets[preset] = next; CR.markDirty(preset); }
+  CR.saveCache();
   if (!(opts && opts.noUndo)) {
     CR.S.undo.push({ preset: preset, values: cur, t: Date.now() });
     if (CR.S.undo.length > 60) CR.S.undo.shift();
@@ -221,3 +287,7 @@ CR.haptic = function () { if (CR.prefs.haptics) CR.native("haptic").catch(functi
 CR.esc = function (s) {
   return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; });
 };
+
+/* Guarda a cópia dos presets no app sempre que algo muda. */
+CR.on("changed", function () { CR.saveCache(); });
+CR.on("preset", function () { CR.saveCache(); });

@@ -26,7 +26,7 @@ CR.Stage = (function () {
     }).join("");
     mb.querySelectorAll(".module-btn").forEach(function (b) {
       b.onclick = function () {
-        if (CR.S.locked || !CR.S.presets) return;
+        if (CR.S.locked) return;
         var m = CR.MODULES[Number(b.dataset.m)];
         CR.set(m.off, CR.moduleOn(m) ? 0 : 1);
         CR.haptic();
@@ -44,7 +44,7 @@ CR.Stage = (function () {
       b.innerHTML = '<span class="t-head"><i class="led"></i><b>' + c.label + '</b></span>' +
         '<span class="t-name">' + c.name + '</span><span class="t-val"></span><span class="t-sub"></span>' +
         '<span class="t-bar' + (c.bipolar ? " bipolar" : "") + '"><i></i></span>';
-      b.onclick = function () { if (!CR.S.locked && CR.S.presets) openAdjust(i); };
+      b.onclick = function () { if (!CR.S.locked) openAdjust(i); };
       t.appendChild(b);
       tiles[c.off] = b;
     });
@@ -95,40 +95,10 @@ CR.Stage = (function () {
 
   /* ================================================================ estados de conexão */
   function showState(st) {
-    var box = $("#stageState"), on = st.state === "on" && !!CR.S.presets;
-    $("#view-stage").classList.toggle("offline", !on);
-    if (on) { box.hidden = true; return; }
-    box.hidden = false;
-    if (st.state === "search") {
-      box.innerHTML = '<div class="state-card"><div class="spinner"></div><h2>Procurando a pedaleira</h2><p>' + CR.esc(st.message || "Verificando a conexão USB.") + "</p></div>";
-      return;
-    }
-    if (st.state === "ensaio") {
-      box.innerHTML = '<div class="state-card">' + CR.icon("headphones", "state-ico") + "<h2>Modo ensaio ligado</h2><p>" + CR.esc(st.message) + "</p>" +
-        '<div class="state-actions"><button class="btn primary big" type="button" data-act="stop">' + CR.icon("stop") + "<span>Sair do ensaio</span></button>" +
-        '<button class="btn big" type="button" data-act="tools">' + CR.icon("tools") + "<span>Ferramentas</span></button></div></div>";
-      box.querySelector('[data-act="stop"]').onclick = function () { CR.native("ensaioStop"); };
-      box.querySelector('[data-act="tools"]').onclick = function () { CR.App.go("tools"); };
-      return;
-    }
-    if (st.state === "tuner") {
-      box.innerHTML = '<div class="state-card">' + CR.icon("tuner", "state-ico") + "<h2>Afinador USB em uso</h2><p>" + CR.esc(st.message) + "</p>" +
-        '<div class="state-actions"><button class="btn primary big" type="button" data-act="tuner">' + CR.icon("tuner") + "<span>Abrir afinador</span></button>" +
-        '<button class="btn big" type="button" data-act="connect">' + CR.icon("plug") + "<span>Reconectar</span></button></div></div>";
-      box.querySelector('[data-act="tuner"]').onclick = function () { CR.App.go("tuner"); };
-      box.querySelector('[data-act="connect"]').onclick = function () { CR.native("connect"); };
-      return;
-    }
-    if (st.state === "on") {
-      box.innerHTML = '<div class="state-card"><h2>Modelo sem presets editáveis</h2><p>Esta Cube Baby é da geração antiga. Use Ferramentas para trocar os IRs.</p></div>';
-      return;
-    }
-    box.innerHTML = '<div class="state-card">' + CR.icon("plug", "state-ico") + "<h2>Conecte a Cube Baby</h2><p>" +
-      CR.esc(st.message && st.message !== "Desconectada" ? st.message : "Ligue a pedaleira no celular com cabo USB e adaptador OTG.") + "</p>" +
-      '<div class="state-actions"><button class="btn primary big" type="button" data-act="connect">' + CR.icon("plug") + "<span>Conectar</span></button>" +
-      '<button class="btn big" type="button" data-act="log">' + CR.icon("list") + "<span>Ver log</span></button></div></div>";
-    box.querySelector('[data-act="connect"]').onclick = function () { CR.native("connect"); };
-    box.querySelector('[data-act="log"]').onclick = function () { CR.Settings.openLog(); };
+    // O Palco nunca bloqueia: sem a pedaleira os ajustes ficam no app (veja CR.syncOnConnect).
+    // O estado da conexão aparece no botão do topo.
+    $("#stageState").hidden = true;
+    $("#view-stage").classList.remove("offline");
   }
 
   /* ================================================================ tela de ajuste */

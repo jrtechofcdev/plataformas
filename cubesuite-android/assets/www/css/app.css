@@ -49,6 +49,9 @@ button { font: inherit; color: inherit; }
 .chip.on .dot { background: var(--brand); box-shadow: 0 0 8px var(--brand); }
 .chip.sim .dot { background: var(--warn); }
 .chip.search .dot { background: var(--warn); animation: blink 1s infinite; }
+.chip.connect { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); font-size: 16px; padding: 0 14px; }
+.chip.connect .ico { width: 20px; height: 20px; }
+.chip.connect:active { transform: scale(.97); }
 @keyframes blink { 50% { opacity: .25; } }
 .icon-btn { width: var(--tap); height: var(--tap); display: grid; place-items: center; border: 1px solid transparent;
   background: transparent; border-radius: 12px; cursor: pointer; color: var(--text-2); }

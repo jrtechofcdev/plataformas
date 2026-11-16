@@ -175,7 +175,7 @@ CR.Tools = (function () {
     bindEnsaio();
     // presets
     $("#pSend").onclick = async function () {
-      if (!CR.S.presets || CR.S.locked) return;
+      if (!CR.S.connected || CR.S.locked) return;
       var name = CR.MODULES[CR.S.preset].fs;
       CR.busy(true, "Enviando preset " + name);
       try {
@@ -186,12 +186,12 @@ CR.Tools = (function () {
       finally { CR.busy(false); }
     };
     $("#pReload").onclick = async function () {
-      try { CR.S.presets = await CR.native("presets"); CR.emit("preset", CR.S.preset); CR.toast("Presets lidos da pedaleira"); }
+      try { CR.S.presets = await CR.native("presets"); CR.S.dirty = {}; CR.saveCache(); CR.emit("preset", CR.S.preset); CR.toast("Presets lidos da pedaleira"); }
       catch (e) { CR.toast(e.message, true); }
     };
     $("#pFactory").onclick = async function () {
       if (!(await CR.confirm("Restaurar presets de fábrica", "Os presets A, B e C voltam aos valores de fábrica. Os ajustes atuais serão perdidos.", "Restaurar"))) return;
-      try { CR.S.presets = await CR.native("factoryPresets"); CR.S.undo = []; CR.emit("preset", CR.S.preset); CR.toast("Presets de fábrica restaurados"); }
+      try { CR.S.presets = await CR.native("factoryPresets"); CR.S.undo = []; CR.S.dirty = {}; CR.saveCache(); CR.emit("preset", CR.S.preset); CR.toast("Presets de fábrica restaurados"); }
       catch (e) { CR.toast(e.message, true); }
     };
     var lsw = CR.makeSwitch(!!CR.S.status.loopback, "USB Loopback", async function () {

@@ -76,7 +76,7 @@ CR.Follow = (function () {
   }
 
   async function wizard() {
-    if (!CR.S.presets) { CR.toast("Conecte a pedaleira primeiro", true); return; }
+    if (!CR.S.connected) { CR.toast("A pesquisa precisa da pedaleira. Toque em Conectar no topo.", true); return; }
     stopPoll();
     var snaps = [];
     for (var i = 0; i < SEQ.length; i++) {
@@ -145,7 +145,7 @@ CR.Follow = (function () {
   /* ================================================================ acompanhar */
   async function poll() {
     timer = null;
-    if (!cfg || !CR.S.presets) return;
+    if (!cfg || !CR.S.connected) return;
     var busy = !document.getElementById("busy").hidden;
     if (document.visibilityState === "visible" && !busy) {
       try {
@@ -163,7 +163,7 @@ CR.Follow = (function () {
     }
     timer = setTimeout(poll, 1000);
   }
-  function startPoll() { if (cfg && !timer && CR.S.presets) timer = setTimeout(poll, 300); }
+  function startPoll() { if (cfg && !timer && CR.S.connected) timer = setTimeout(poll, 300); }
   function stopPoll() { clearTimeout(timer); timer = null; }
   function forget() { cfg = null; CR.store.set("cr.follow", null); stopPoll(); playing = null; CR.emit("playing", null); CR.emit("followcfg"); }
 
@@ -177,7 +177,7 @@ CR.Follow = (function () {
     return '<article class="card" id="followCard"><header class="card-head">' + CR.icon("search2") + "<div><h2>Footswitch ativo <span class=\"tag-exp\">experimental</span></h2>" +
       "<p>" + (cfg ? "Acompanhando pela posição " + CR.esc(cfg.name) + "." + (playing !== null ? " Agora tocando: " + "ABC"[playing] + "." : "")
         : "Ensine o app a saber qual footswitch (A, B ou C) está tocando na pedaleira.") + "</p></div></header>" +
-      '<button class="btn wide big' + (cfg ? "" : " primary") + '" type="button" id="fsFind"' + (CR.S.presets ? "" : " disabled") + ">" + CR.icon("search2") +
+      '<button class="btn wide big' + (cfg ? "" : " primary") + '" type="button" id="fsFind"' + (CR.S.connected ? "" : " disabled") + ">" + CR.icon("search2") +
         "<span>" + (cfg ? "Descobrir de novo" : "Descobrir o footswitch") + "</span></button>" +
       (cfg ? '<div class="set-row"><div><b>Seguir a pedaleira</b><span>Quando você pisa num footswitch, o Palco passa a editar esse preset.</span></div><span id="swFollow"></span></div>' +
              '<div class="set-row"><div><b>Ao vivo só no que toca</b><span>Boost, Mudo, Swell e Fade agem só no footswitch que está tocando (e acompanham se você trocar).</span></div><span id="swLiveOne"></span></div>' +
