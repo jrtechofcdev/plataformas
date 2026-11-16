@@ -9,20 +9,38 @@
 @font-face { font-family: "Barlow"; font-weight: 600; font-display: block; src: url(../fonts/barlow-latin-600-normal.woff2) format("woff2"); }
 
 :root {
-  /* app */
-  --bg: #0b0d10;
-  --surface: #14171c;
-  --surface-2: #1b1f26;
-  --surface-3: #232831;
-  --line: #2b313b;
-  --line-strong: #3a424f;
+  /* app: fundo e superfícies (do mais fundo para o mais alto) */
+  --bg: #07090c;
+  --bg-glow: rgba(51, 234, 184, .07);    /* brilho verde-água bem leve no alto da tela */
+  --surface: #12151a;
+  --surface-2: #191d23;
+  --surface-3: #21262e;
+  --line: #262c35;
+  --line-strong: #353d49;
+  --line-soft: rgba(255, 255, 255, .06);
   --text: #ecf0f4;
   --text-2: #b4bec9;
   --muted: #8d99a6;
   --brand: #33eab8;
+  --brand-2: #23c8e0;                    /* segunda cor do gradiente da marca (ciano) */
   --brand-ink: #04130e;
   --danger: #ff6b5e;
   --warn: #f2c14e;
+
+  /* acabamento: gradiente dos cartões, brilho da borda de cima e sombras (3 alturas) */
+  --sheen: linear-gradient(180deg, rgba(255, 255, 255, .045), rgba(255, 255, 255, .008) 55%, rgba(0, 0, 0, .06));
+  --hl: inset 0 1px 0 rgba(255, 255, 255, .07);
+  --e1: 0 1px 2px rgba(0, 0, 0, .45), 0 4px 12px -4px rgba(0, 0, 0, .5);
+  --e2: 0 10px 28px -8px rgba(0, 0, 0, .7);
+  --e3: 0 24px 60px -12px rgba(0, 0, 0, .85);
+  --brand-grad: linear-gradient(135deg, #46f2c4 0%, var(--brand) 45%, var(--brand-2) 100%);
+  --brand-glow: 0 8px 24px -8px rgba(51, 234, 184, .55);
+
+  /* vidro: só no topo, na barra de abas, nas janelas e nos avisos */
+  --glass: rgba(15, 18, 23, .66);
+  --glass-strong: rgba(13, 15, 19, .86);
+  --glass-line: rgba(255, 255, 255, .09);
+  --blur: blur(20px) saturate(160%);
 
   /* pedaleira */
   --panel-top: #18191c;
@@ -44,17 +62,28 @@
   --font-body: "Barlow", system-ui, Roboto, sans-serif;
 
   /* medidas */
-  --header-h: 52px;
-  --nav-h: 62px;
-  --rail-w: 76px;
+  --header-h: 54px;
+  --nav-h: 60px;                         /* altura da barra em pílula */
+  --nav-m: 8px;                          /* distância da pílula até a borda da tela */
+  --nav-space: calc(var(--nav-h) + var(--nav-m) * 2 + env(safe-area-inset-bottom));
+  --rail-w: 84px;
   --gap: 10px;
-  --radius: 14px;
-  --radius-sm: 10px;
+  --radius: 16px;
+  --radius-sm: 12px;
+  --radius-lg: 22px;
   --tap: 44px;
+
+  /* movimento (Ajustes > Animações > Leves deixa tudo mais curto e sem efeitos) */
+  --dur-1: 120ms;
+  --dur-2: 200ms;
+  --dur-3: 320ms;
+  --ease-out: cubic-bezier(.22, 1, .36, 1);
+  --ease-spring: cubic-bezier(.34, 1.45, .55, 1);
+  --press: .965;
 
   color-scheme: dark;
 }
 
 @media (orientation: landscape) and (max-height: 560px) {
-  :root { --header-h: 44px; --gap: 8px; }
+  :root { --header-h: 46px; --gap: 8px; --nav-space: 0px; }
 }

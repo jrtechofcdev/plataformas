@@ -19,9 +19,39 @@ O app é usado de pé, durante o culto, com pouco tempo e pouca luz. Função ve
 As cores e os nomes continuam os da pedaleira, para reconhecer cada controle sem ler.
 
 ## Dials (anti-slop)
-- ENERGY 2: presença firme, sem efeitos chamativos.
+- ENERGY 3 (versão 2.7): acabamento refinado, com vidro e gradiente só onde ajudam a ler e a navegar.
 - RHYTHM 1: painel de instrumento, alinhamento previsível. Nada de mosaico de cartões.
-- MOTION 1: só movimentos funcionais (LED acende e apaga, agulha do afinador, tela de ajuste sobe).
+- MOTION 3 (versão 2.7): movimento expressivo, mas sempre curto e com propósito. Ajustes > Tela >
+  Animações > Leves (ou o Android pedindo menos movimento) volta para quase nenhum movimento.
+
+## Acabamento (versão 2.7: "atual lapidado" + vidro e gradiente)
+- **Superfícies**: fundo `#07090c` com um brilho verde-água bem leve no alto. Cartões e botões com
+  gradiente vertical sutil (`--sheen`), borda de 1 px quase invisível, um fio de luz no topo (`--hl`)
+  e sombra em 3 alturas (`--e1`, `--e2`, `--e3`). Tudo em `css/tokens.css`.
+- **Vidro** (desfoque `--blur`): só no "cromo" do app, por onde o conteúdo passa por baixo: topo,
+  barra de abas em pílula, janelas (folhas), avisos, abas internas e chips grudados no topo.
+  Nunca nos 10 controles do Palco (desempenho e leitura).
+- **Gradiente da marca** (`--brand-grad`, verde-água para ciano): botão principal, Conectar, aba
+  ativa, opção escolhida e a assinatura "by Jr_Tech_OFC".
+- **Gradiente do LED**: o estado ativo de preset, módulo, controle, atalho e modelo ganha um
+  gradiente da cor do seu LED, com a borda acesa.
+
+## Movimento (versão 2.7)
+| Onde | O quê | Tempo |
+|---|---|---|
+| Barra de abas | destaque em pílula desliza com mola até a aba tocada | 320 ms |
+| Troca de aba | a tela nova entra deslizando do lado da aba; a antiga some | 340 / 170 ms |
+| Listas e cartões | entram em cascata (até 14 itens, 34 ms entre eles) | 380 ms |
+| Toque | o botão afunda (96,5%) e solta uma onda de luz da cor do LED | 560 ms |
+| Tela de ajuste | nasce do controle tocado e fecha voltando para ele; setas deslizam | 320 ms |
+| Números | rolam para cima quando o valor sobe e para baixo quando desce | 230 ms |
+| Trocar de preset | os 10 valores entram em cascata | 300 ms |
+| LEDs acesos | halo "respira" devagar; módulo ligado dá um flash curto | 3,4 s / 550 ms |
+| Janelas | sobem com mola; fecham descendo; arrastar a alça para baixo fecha | 320 ms |
+| Avisos e "Aguarde" | avisos sobem em pílula; "Aguarde" só aparece se passar de 0,15 s | 200 ms |
+
+Regras: animar só posição e transparência; o atributo `hidden` continua mandando (o CSS segura o
+elemento visível pelo tempo da saída); nada de animação que atrase um toque. Código em `js/ui.js`.
 
 ## Cores
 | Papel | Valor | Por quê |
@@ -39,8 +69,10 @@ Regra do acento: as cores de LED pertencem aos controles da pedaleira; o teal pe
 Um nunca substitui o outro.
 
 ## Brilho (glow)
-Usado somente em LEDs, porque espelha o hardware: LED aceso quer
-dizer efeito ligado (manual do fabricante, modo LIVE). Nenhum outro elemento brilha.
+Principalmente nos LEDs, porque espelha o hardware: LED aceso quer dizer efeito ligado (manual do
+fabricante, modo LIVE). Na versão 2.7 o brilho também marca o que está escolhido: o valor gigante
+da tela de ajuste, a barra de cada controle ativo, o botão principal e a aba ativa. O que está
+apagado ou zerado nunca brilha.
 
 ## Tipografia
 - Barlow Condensed (500/600/700): nomes dos controles, números, cabeçalhos. Lembra a serigrafia

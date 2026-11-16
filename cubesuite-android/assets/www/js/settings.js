@@ -5,7 +5,7 @@ var CR = window.CR || (window.CR = {});
 
 CR.Settings = (function () {
   var $ = function (s, root) { return (root || document).querySelector(s); };
-  var appInfo = { version: "2.6.0" };
+  var appInfo = { version: "2.7.0" };
 
   function seg(name, options, current) {
     return '<div class="seg" role="group" data-seg="' + name + '">' + options.map(function (o) {
@@ -21,6 +21,9 @@ CR.Settings = (function () {
         seg("orientation", [["auto", "Automática"], ["portrait", "Em pé"], ["landscape", "Deitado"]], p.orientation) +
         '<div class="set-row"><div><b>Como mostrar os valores</b><span>Passos: a posição real da pedaleira (GAIN 0 a 7, TONE 0 a 15, VOLUME 0 a 127), sempre de 1 em 1. Porcentagem: o mesmo valor em %, que pula nos controles com poucas posições.</span></div></div>' +
         seg("display", [["steps", "Passos"], ["percent", "Porcentagem"]], p.display) +
+        '<div class="set-row"><div><b>Animações</b><span>Completas: telas deslizando, brilho e efeitos de vidro. Leves: quase sem movimento, para celulares mais simples.' +
+          (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches ? " O Android está pedindo menos animação, então o app usa Leves." : "") + "</span></div></div>" +
+        seg("motion", [["full", "Completas"], ["lite", "Leves"]], p.motion) +
         '<div class="set-row"><div><b>Vibrar ao tocar</b><span>Retorno tátil a cada toque e a cada passo do ajuste.</span></div><span id="swHaptic"></span></div>' +
         '<div class="set-row"><div><b>Trava de palco</b><span>O cadeado no topo trava todos os controles. Para destravar, segure o cadeado por 1 segundo.</span></div></div></article>' +
 
@@ -66,6 +69,7 @@ CR.Settings = (function () {
           g.querySelectorAll("button").forEach(function (x) { x.setAttribute("aria-pressed", String(x === b)); });
           if (key === "orientation") CR.native("setOrientation", { mode: CR.prefs.orientation });
           if (key === "display") CR.Stage.refresh();
+          if (key === "motion") CR.UI.applyMotion();
           CR.haptic();
         };
       });

@@ -4,8 +4,12 @@ App Android para controlar a pedaleira **Cube Baby** pelo cabo USB (OTG), em tem
 em pé ou deitado. Criado do zero por José Renato (Jr_Tech_OFC).
 © 2026 José Renato · Jr_Tech_OFC. Todos os direitos reservados (veja `LICENSE`).
 
-## Funções (versão 2.6)
+## Funções (versão 2.7)
 Feito para mexer rápido e com precisão durante o culto, com botões grandes.
+- **Interface refinada (2.7)**: visual escuro com vidro e gradientes, barra de abas flutuante em
+  pílula, telas que deslizam, janelas que sobem e descem (arraste a alça para baixo para fechar),
+  números que rolam, LEDs que respiram e onda de luz no toque. Em **Ajustes > Tela > Animações**,
+  "Leves" desliga os efeitos para celulares mais simples.
 - **Palco** (tela principal, nunca rola):
   - **Presets A, B, C** em botões grandes (LED verde, azul, vermelho, como na pedaleira).
   - **Módulos 1, 2, 3** (IR CAB + REVERB, DELAY + MOD, AMP): um toque liga ou desliga no preset.
@@ -94,7 +98,7 @@ Feito para mexer rápido e com precisão durante o culto, com botões grandes.
 - Desfazer e **trava de palco** (segurar o cadeado 1 s para destravar) no topo.
 
 ## Instalar
-1. Copie `CubeRemote-2.6.0.apk` para o celular e abra (permita "fontes desconhecidas").
+1. Copie `CubeRemote-2.7.0.apk` para o celular e abra (permita "fontes desconhecidas").
    Instala por cima das versões anteriores (mesma chave de assinatura).
 2. Ligue a pedaleira com cabo USB + adaptador OTG. O app conecta sozinho.
 3. Na primeira vez que abrir o afinador, permita o uso do microfone.
@@ -110,7 +114,7 @@ IR CAB e os módulos 1, 2 e 3 nos bytes 10, 11 e 12.
 ## Gerar o APK (sem Android Studio)
 ```bash
 sdkmanager "platforms;android-34" "build-tools;35.0.0"
-ANDROID_HOME=~/android-sdk ./build.sh        # gera dist/CubeRemote-2.6.0.apk
+ANDROID_HOME=~/android-sdk ./build.sh        # gera dist/CubeRemote-2.7.0.apk
 ```
 A assinatura usa `~/.cuberemote.jks`. Guarde esse arquivo: sem ele, uma versão nova não instala por cima.
 
@@ -125,6 +129,7 @@ cubesuite-android/
 │   ├── css/app.css           layout (em pé, deitado e celulares pequenos)
 │   ├── js/model.js           controles da pedaleira, nomes do TYPE e IR CAB, envio, desfazer
 │   ├── js/controls.js        slider e chave liga/desliga
+│   ├── js/ui.js              movimento: troca de abas, pílula, onda de luz, janelas, cascata
 │   ├── js/stage.js           tela Palco e tela de ajuste
 │   ├── js/memory.js          aba Memórias (10 sons, fábrica e backup)
 │   ├── js/sounds.js          sons prontos para o culto (edite aqui)
@@ -157,7 +162,7 @@ cubesuite-android/
 ```
 
 ### Personalizar
-- Cores e fontes: `assets/www/css/tokens.css`.
+- Cores, fontes, sombras, vidro e velocidade das animações: `assets/www/css/tokens.css`.
 - Nomes e textos explicativos: `assets/www/js/model.js` e `assets/www/js/learn-data.js`.
 - Ver a interface no computador: abra `assets/www/index.html` no Chrome (roda com um simulador).
 

@@ -60,7 +60,10 @@ CR.Stage = (function () {
     var b = tiles[c.off];
     if (!b) return;
     var v = CR.val(c), f = CR.format(c, v);
-    b.querySelector(".t-val").textContent = f.short;
+    // o número rola para cima ou para baixo quando muda (só com a tela de ajuste fechada, para não gastar à toa)
+    var dir = b._v === undefined || !$("#adjust").hidden ? 0 : Math.sign(v - b._v);
+    b._v = v;
+    CR.UI.roll(b.querySelector(".t-val"), f.short, dir);
     b.querySelector(".t-sub").textContent = c.list ? CR[c.list][v].name + (c.key === "irCab" && CR.EQ && CR.EQ.activeFor(CR.S.preset) ? " · EQ" : "") :
       (c.bipolar ? (v === c.zero ? "Desligado" : v < c.zero ? "Chorus" : "Phaser") :
        c.key === "time" && CR.Delay && CR.Delay.calibrated() ? CR.Delay.msOf(v) + " ms" : CR.prefs.display === "percent" ? "" : "de " + c.max);
@@ -72,12 +75,18 @@ CR.Stage = (function () {
   }
 
   /* Botão EQ do Palco: estado do equalizador do preset (ou do gabinete) em edição e uma mini curva. */
+  var eqSig = "", eqCurveSig = "";
   function paintEq() {
     var b = document.getElementById("eqStrip");
     if (!b || !CR.EQ) return;
     var t = CR.EQ.defaultTarget(), m = CR.EQ.mode(), c = t === null ? null : CR.EQ.curve(t), on = !!(c && c.on && !(m === "cab" && CR.EQ.isFlat(c)));
     var who = m === "preset" ? "Preset " + "ABC"[CR.S.preset] : t === null ? "Sem gabinete" : "Gabinete " + (t + 2);
-    var path = "";
+    // só redesenha quando algo do EQ mudou (o Palco chama isto a cada passo de qualquer controle)
+    var cs = c ? JSON.stringify(c) : "", sig = who + "|" + on + "|" + cs;
+    if (sig === eqSig) return;
+    eqSig = sig;
+    var path = "", curveChanged = cs !== eqCurveSig && eqCurveSig !== "";
+    eqCurveSig = cs;
     if (c) {
       var pts = CR.EQ.target(c).filter(function (v, i) { return i % 3 === 0; });
       path = pts.map(function (v, i) { return (i ? "L" : "M") + (i / (pts.length - 1) * 100).toFixed(1) + " " + (14 - Math.max(-12, Math.min(12, v)) * 0.9).toFixed(1); }).join(" ");
@@ -87,6 +96,9 @@ CR.Stage = (function () {
       '<span class="eq-strip-txt"><b>EQ</b><small>' + who + " · " + (on ? "Ligado" : "Desligado") + "</small></span>" +
       '<svg class="eq-spark" viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true"><path d="M0 14H100" class="z"/>' + (path ? '<path d="' + path + '"/>' : "") + "</svg>" +
       CR.icon("chevron");
+    // curva nova: ela "cresce" a partir da linha do meio
+    if (curveChanged) CR.UI.anim(b.querySelector(".eq-spark path:not(.z)"), [{ transform: "scaleY(.15)", opacity: .3 }, { transform: "none", opacity: 1 }],
+      { duration: 420, easing: "cubic-bezier(.34, 1.45, .55, 1)" });
   }
 
   function refresh() {
@@ -131,7 +143,8 @@ CR.Stage = (function () {
     return [0, 25, 50, 75, 100].map(function (p) { var v = Math.round(p / 100 * c.max); return [v, pctMode ? p + "%" : String(v)]; });
   }
 
-  function openAdjust(i) {
+  function openAdjust(i, navDir) {
+    var wasOpen = !$("#adjust").hidden && !!adj.c;
     adj.idx = i;
     adj.c = CR.CONTROLS[i];
     adj.start = CR.val(adj.c);
@@ -192,12 +205,17 @@ CR.Stage = (function () {
     };
     $("[data-learn]", el).onclick = function () { closeAdjust(); CR.App.go("learn", "c-" + c.key); };
     el.querySelectorAll("[data-nav]").forEach(function (b) {
-      b.onclick = function () { openAdjust((adj.idx + Number(b.dataset.nav) + CR.CONTROLS.length) % CR.CONTROLS.length); };
+      b.onclick = function () { CR.haptic(); openAdjust((adj.idx + Number(b.dataset.nav) + CR.CONTROLS.length) % CR.CONTROLS.length, Number(b.dataset.nav)); };
     });
     $("[data-close]", el).onclick = closeAdjust;
     if (c.key === "time") bindTap(el);
+    if (!wasOpen) CR.UI.zoomFrom(el, tiles[c.off]);      // a tela "nasce" do controle tocado
+    adj.shown = undefined;
     el.hidden = false;
     refreshAdjust();
+    // setas ‹ ›: o conteúdo desliza para o lado do controle vizinho
+    if (wasOpen && navDir) CR.UI.anim($(".adj-main", el), [{ transform: "translateX(" + (navDir * 44) + "px)", opacity: 0 }, { transform: "none", opacity: 1 }],
+      { duration: 280, easing: "cubic-bezier(.22, 1, .36, 1)" });
     $(".adj-close", el).focus();
   }
 
@@ -265,7 +283,8 @@ CR.Stage = (function () {
     var c = adj.c, el = $("#adjust");
     if (!c || el.hidden) return;
     var v = CR.val(c), f = CR.format(c, v);
-    $(".av-big", el).textContent = f.short;
+    CR.UI.roll($(".av-big", el), f.short, adj.shown === undefined ? 0 : Math.sign(v - adj.shown));
+    adj.shown = v;
     $(".av-long", el).textContent = c.list ? CR[c.list][v].kind + " · " + f.long : f.long +
       (c.key === "time" && CR.Delay.calibrated() ? " · " + CR.Delay.msOf(v) + " ms" : "");
     if (adj.slider) adj.slider.update();
@@ -280,9 +299,12 @@ CR.Stage = (function () {
   }
 
   function closeAdjust() {
+    var el = $("#adjust");
+    // fecha voltando para o controle de onde veio (se o Palco ainda estiver na tela)
+    if (adj.c && !el.hidden) CR.UI.zoomFrom(el, document.getElementById("app").dataset.view === "stage" ? tiles[adj.c.off] : null);
     adj.c = null;
     adj.slider = null;
-    $("#adjust").hidden = true;
+    el.hidden = true;
   }
 
   /* ================================================================ diálogo (explicações e confirmações) */
@@ -293,6 +315,7 @@ CR.Stage = (function () {
       '<button class="icon-btn" type="button" data-close aria-label="Fechar">' + CR.icon("close") + "</button></div>" +
       '<div class="dialog-body">' + bodyHtml + "</div>";
     var d = $("#dialog");
+    if (!d.hidden) CR.UI.anim(card, [{ opacity: .35, transform: "translateY(10px)" }, { opacity: 1, transform: "none" }], { duration: 220, easing: "ease-out" });
     d.hidden = false;
     d.querySelectorAll("[data-close]").forEach(function (b) { b.onclick = function () { d.hidden = true; }; });
   }
@@ -316,7 +339,17 @@ CR.Stage = (function () {
   CR.on("eq", refresh);
   document.getElementById("eqStrip").onclick = function () { if (!CR.S.locked) CR.EQScreen.open(); };
   CR.on("playing", refresh);
-  CR.on("preset", function () { if (adj.c) adj.start = CR.val(adj.c); refresh(); });
+  CR.on("preset", function () {
+    if (adj.c) adj.start = CR.val(adj.c);
+    refresh();
+    // trocou de preset: os 10 valores entram em cascata
+    if (document.getElementById("app").dataset.view === "stage" && $("#adjust").hidden)
+      CR.CONTROLS.forEach(function (c, i) {
+        var b = tiles[c.off];
+        if (b) CR.UI.anim(b.querySelector(".t-val"), [{ opacity: 0, transform: "translateY(28%)" }, { opacity: 1, transform: "none" }],
+          { duration: 300, delay: i * 22, easing: "cubic-bezier(.22, 1, .36, 1)", fill: "backwards" });
+      });
+  });
 
   return { render: render, refresh: refresh, showState: showState, openAdjust: openAdjust, closeAdjust: closeAdjust };
 })();

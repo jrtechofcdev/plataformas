@@ -141,7 +141,7 @@ CR.Culto = (function () {
     var view = document.getElementById("view-culto");
     if (!view || document.getElementById("app").dataset.view !== "culto") return;
     if (!loaded || !CR.Memory.ready()) {
-      view.innerHTML = '<div class="page"><div class="state-card"><div class="spinner"></div><h2>Abrindo a setlist</h2></div></div>';
+      view.innerHTML = CR.UI.skeleton(3, "Abrindo a setlist");
       Promise.all([loaded ? 0 : load(), CR.Memory.ready() ? 0 : CR.Memory.init()]).then(render);
       return;
     }

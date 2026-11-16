@@ -265,7 +265,7 @@ CR.store = {
   get: function (k, d) { try { var v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (_) { return d; } },
   set: function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} },
 };
-CR.prefs = Object.assign({ display: "steps", tuning: "std", tunerView: "needle", orientation: "auto", haptics: true, tunerSource: "mic", a4: 440 },
+CR.prefs = Object.assign({ display: "steps", tuning: "std", tunerView: "needle", orientation: "auto", haptics: true, tunerSource: "mic", a4: 440, motion: "full" },
                          CR.store.get("cr.prefs", {}));
 CR.savePrefs = function () { CR.store.set("cr.prefs", CR.prefs); };
 
@@ -288,9 +288,11 @@ CR.haptic = (function () {
   CR.toast = function (msg, err) {
     var t = document.getElementById("toast");
     if (!t) return;
+    var was = !t.hidden && t.textContent !== msg;
     t.textContent = msg;
     t.className = "toast" + (err ? " err" : "");
     t.hidden = false;
+    if (was && CR.UI) CR.UI.bump(t);           // aviso novo por cima de outro: um "pulo" curto
     clearTimeout(timer);
     timer = setTimeout(function () { t.hidden = true; }, err ? 5000 : 2600);
   };

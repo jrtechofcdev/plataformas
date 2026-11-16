@@ -205,7 +205,7 @@ CR.Library = (function () {
 
   var current = [];
   function render(view, tabs) {
-    if (!loaded) { view.innerHTML = '<div class="page">' + tabs + '<div class="state-card"><div class="spinner"></div><h2>Abrindo a biblioteca</h2></div></div>'; load().then(function () { CR.Memory.render(); }); return; }
+    if (!loaded) { view.innerHTML = CR.UI.skeleton(3, "Abrindo a biblioteca", tabs); load().then(function () { CR.Memory.render(); }); return; }
     var y = view.scrollTop;
     var up = '<label class="btn wide big primary file-btn">' + CR.icon("file") + '<span>Subir presets (.zip ou .json)</span><input id="libFiles" type="file" accept=".zip,.json,application/zip,application/json" multiple hidden></label>';
     if (!data.items.length) {

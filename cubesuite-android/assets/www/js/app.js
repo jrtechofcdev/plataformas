@@ -10,13 +10,14 @@ CR.App = (function () {
   function go(view, anchor) {
     if (view !== "tuner" && CR.Tuner.isActive()) CR.Tuner.stop();
     if (view !== "stage") CR.Stage.closeAdjust();
-    document.getElementById("app").dataset.view = view;
-    document.querySelectorAll(".view").forEach(function (v) { v.classList.toggle("active", v.id === "view-" + view); });
+    var app = document.getElementById("app"), from = app.dataset.view;
+    app.dataset.view = view;
     document.querySelectorAll(".nav button").forEach(function (b) {
       var on = b.dataset.go === (view === "learn" ? "settings" : view);
       b.classList.toggle("active", on);
       if (on) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
     });
+    CR.UI.moveIndicator();
     if (view === "learn" && !rendered.learn) { CR.Learn.render(); rendered.learn = true; }
     if (view === "tools") { if (!rendered.tools) { CR.Tools.render(); rendered.tools = true; } else CR.Tools.refresh(); }
     if (view === "settings") CR.Settings.render();
@@ -24,6 +25,13 @@ CR.App = (function () {
     if (view === "memory") CR.Memory.render();
     if (view === "culto") CR.Culto.render();
     if (anchor && view === "learn") setTimeout(function () { CR.Learn.scrollTo(anchor); }, 30);
+    // a tela já está montada: agora ela entra deslizando (ui.js). Montar antes evita um "pulo" no começo da animação.
+    CR.UI.switchView(from, view);
+    if (from !== view) {
+      var el = document.getElementById("view-" + view);
+      if (view === "stage") CR.UI.cascade(el, { sel: ".preset-bar > *, .module-bar > *, .eq-strip, .tiles > *", step: 16, dy: 10, max: 16, dur: 320, delay: 30 });
+      else if (view !== "tuner") CR.UI.cascade(el);
+    }
   }
 
   /* ---------------------------------------------------------------- conexão */
@@ -96,7 +104,10 @@ CR.App = (function () {
       else { CR.haptic(); CR.native("connect"); }
     };
     paintChip(CR.S.status);
-    document.querySelectorAll(".nav button").forEach(function (b) { b.onclick = function () { go(b.dataset.go); }; });
+    document.querySelectorAll(".nav button").forEach(function (b) {
+      b.onclick = function () { if (!b.classList.contains("active")) CR.haptic(); go(b.dataset.go); };
+    });
+    CR.UI.init();
     initLock();
     CR.Stage.render();
     CR.Memory.init();

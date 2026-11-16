@@ -161,7 +161,11 @@ CR.Memory = (function () {
   }
   function bindTabs(view) {
     view.querySelectorAll("[data-memtab]").forEach(function (b) {
-      b.onclick = function () { CR.prefs.memTab = b.dataset.memtab; CR.savePrefs(); view.scrollTop = 0; render(); };
+      b.onclick = function () {
+        if (CR.prefs.memTab === b.dataset.memtab) return;
+        CR.prefs.memTab = b.dataset.memtab; CR.savePrefs(); view.scrollTop = 0; CR.haptic(); render();
+        CR.UI.cascade(view, { sel: ".page > :not(.mem-tabs), .mem-list > *, .lib-list > *" });
+      };
     });
   }
 
@@ -174,7 +178,7 @@ CR.Memory = (function () {
       return;
     }
     if (!loaded) {
-      view.innerHTML = '<div class="page"><div class="state-card"><div class="spinner"></div><h2>Abrindo memórias</h2></div></div>';
+      view.innerHTML = CR.UI.skeleton(4, "Abrindo memórias");
       load().then(render);
       return;
     }
